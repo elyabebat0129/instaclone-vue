@@ -1,0 +1,975 @@
+openapi: 3.0.3
+info:
+  title: InstaClone API
+  description: |
+    RESTful API for InstaClone, a social network inspired by Instagram.
+
+    Authentication is handled via Laravel Sanctum personal access tokens. After
+    calling `POST /auth/login` or `POST /auth/register`, send the returned
+    `access_token` on protected routes as `Authorization: Bearer <token>`.
+  version: "1.0.0"
+servers:
+  - url: http://localhost:8000/api
+    description: Local dev (php artisan serve)
+tags:
+  - name: Auth
+  - name: Users
+  - name: Follow
+  - name: Posts
+  - name: Feed
+  - name: Likes
+  - name: Comments
+  - name: Notifications
+security:
+  - bearerAuth: []
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User created, token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in with email and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated, token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke the current access token
+      responses:
+        '200':
+          description: Token revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate the current access token
+      description: Deletes the current token and issues a new one. The old bearer becomes invalid immediately.
+      responses:
+        '200':
+          description: New token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get the authenticated user
+      responses:
+        '200':
+          description: Authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /users/search:
+    get:
+      tags: [Users]
+      summary: Search users by name or username
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 50
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Paginated user list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/LengthAwarePaginator'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/User' }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /users/me:
+    put:
+      tags: [Users]
+      summary: Update the authenticated user's profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /users/me/avatar:
+    post:
+      tags: [Users]
+      summary: Upload the authenticated user's avatar
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [avatar]
+              properties:
+                avatar:
+                  type: string
+                  format: binary
+                  description: Image file (jpeg/jpg/png/webp), max 2 MB
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /users/{username}:
+    get:
+      tags: [Users]
+      summary: Get a user's public profile
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{id}/posts:
+    get:
+      tags: [Posts]
+      summary: List a user's posts
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Paginated posts
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/LengthAwarePaginator'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Post' }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{id}/followers:
+    get:
+      tags: [Follow]
+      summary: List a user's followers
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Paginated followers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/LengthAwarePaginator'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/UserWithPivot' }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{id}/following:
+    get:
+      tags: [Follow]
+      summary: List who a user is following
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Paginated following list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/LengthAwarePaginator'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/UserWithPivot' }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{id}/is-following:
+    get:
+      tags: [Follow]
+      summary: Check whether the authenticated user follows the target
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Follow state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  is_following: { type: boolean }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{id}/follow:
+    post:
+      tags: [Follow]
+      summary: Follow a user
+      description: Idempotent — following an already-followed user returns 200 without creating a duplicate row.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Following
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: 'Followed.' }
+                  is_following: { type: boolean, example: true }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Self-follow attempt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+  /users/{id}/unfollow:
+    delete:
+      tags: [Follow]
+      summary: Unfollow a user
+      description: Idempotent — unfollowing a not-followed user returns 200.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Not following
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: 'Unfollowed.' }
+                  is_following: { type: boolean, example: false }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Self-unfollow attempt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+  /posts:
+    post:
+      tags: [Posts]
+      summary: Create a post
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: Image file (jpeg/jpg/png/webp), max 5 MB
+                caption:
+                  type: string
+                  maxLength: 2200
+      responses:
+        '201':
+          description: Post created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /posts/{post}:
+    get:
+      tags: [Posts]
+      summary: Get a post
+      parameters:
+        - $ref: '#/components/parameters/PostId'
+      responses:
+        '200':
+          description: Post
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Posts]
+      summary: Update a post's caption
+      parameters:
+        - $ref: '#/components/parameters/PostId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                caption:
+                  type: string
+                  nullable: true
+                  maxLength: 2200
+      responses:
+        '200':
+          description: Updated post
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Posts]
+      summary: Delete a post
+      parameters:
+        - $ref: '#/components/parameters/PostId'
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /feed:
+    get:
+      tags: [Feed]
+      summary: Get the authenticated user's feed
+      description: Posts from followed users, ordered newest first. Cursor-paginated.
+      parameters:
+        - $ref: '#/components/parameters/PerPage'
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: Cursor-paginated feed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/CursorPaginator'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/FeedPost' }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /posts/{post}/like:
+    post:
+      tags: [Likes]
+      summary: Like a post
+      description: Idempotent — liking an already-liked post returns 200 without creating a duplicate.
+      parameters:
+        - $ref: '#/components/parameters/PostId'
+      responses:
+        '200':
+          description: Liked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: 'Liked.' }
+                  liked: { type: boolean, example: true }
+                  likes_count: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /posts/{post}/unlike:
+    delete:
+      tags: [Likes]
+      summary: Unlike a post
+      description: Idempotent — unliking a not-liked post returns 200.
+      parameters:
+        - $ref: '#/components/parameters/PostId'
+      responses:
+        '200':
+          description: Unliked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: 'Unliked.' }
+                  liked: { type: boolean, example: false }
+                  likes_count: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /posts/{post}/likes:
+    get:
+      tags: [Likes]
+      summary: List users who liked a post
+      parameters:
+        - $ref: '#/components/parameters/PostId'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Paginated likers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/LengthAwarePaginator'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/UserWithPivot' }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /posts/{post}/comments:
+    get:
+      tags: [Comments]
+      summary: List comments on a post
+      parameters:
+        - $ref: '#/components/parameters/PostId'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Paginated comments
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/LengthAwarePaginator'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Comment' }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Comments]
+      summary: Create a comment on a post
+      parameters:
+        - $ref: '#/components/parameters/PostId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+                  minLength: 1
+                  maxLength: 2200
+      responses:
+        '201':
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /comments/{comment}:
+    put:
+      tags: [Comments]
+      summary: Update a comment (author only)
+      parameters:
+        - name: comment
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+                  minLength: 1
+                  maxLength: 2200
+      responses:
+        '200':
+          description: Updated comment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Comments]
+      summary: Delete a comment (author only)
+      parameters:
+        - name: comment
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List the authenticated user's notifications
+      parameters:
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Paginated notifications
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/LengthAwarePaginator'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Notification' }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Get the unread notification count
+      responses:
+        '200':
+          description: Unread count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  unread_count: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /notifications/read:
+    put:
+      tags: [Notifications]
+      summary: Mark all notifications as read
+      responses:
+        '200':
+          description: Marked read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: 'Marked as read.' }
+                  updated: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+      description: |
+        Sanctum personal access token. Token format is `{id}|{random}`.
+        Obtain one via `POST /auth/register` or `POST /auth/login`.
+
+  parameters:
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    PostId:
+      name: post
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    PerPage:
+      name: per_page
+      in: query
+      required: false
+      description: Items per page (clamped to 1–50).
+      schema: { type: integer, minimum: 1, maximum: 50 }
+    Page:
+      name: page
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1 }
+
+  responses:
+    Unauthenticated:
+      description: Missing or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MessageResponse'
+          example:
+            message: Unauthenticated.
+    InvalidCredentials:
+      description: Email/password mismatch
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MessageResponse'
+          example:
+            message: Invalid credentials.
+    Forbidden:
+      description: Ownership/policy check failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MessageResponse'
+          example:
+            message: This action is unauthorized.
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MessageResponse'
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorBody'
+
+  schemas:
+    MessageResponse:
+      type: object
+      properties:
+        message: { type: string }
+
+    ValidationErrorBody:
+      type: object
+      properties:
+        message: { type: string }
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+
+    RegisterRequest:
+      type: object
+      required: [name, username, email, password, password_confirmation]
+      properties:
+        name: { type: string, maxLength: 255 }
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+          pattern: '^[a-zA-Z0-9_.]+$'
+        email: { type: string, format: email }
+        password: { type: string, format: password, minLength: 8 }
+        password_confirmation: { type: string, format: password }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 255 }
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+          pattern: '^[a-zA-Z0-9_.]+$'
+        bio: { type: string, maxLength: 500, nullable: true }
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, example: Bearer }
+        expires_in:
+          type: integer
+          nullable: true
+          description: Seconds until expiration (null when tokens don't expire).
+        user: { $ref: '#/components/schemas/User' }
+
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        username: { type: string, nullable: true }
+        email: { type: string, format: email }
+        bio: { type: string, nullable: true }
+        avatar_url:
+          type: string
+          nullable: true
+          description: Absolute URL to the avatar image (null when unset).
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    UserWithPivot:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            pivot:
+              type: object
+              description: Pivot row timestamps (varies by relation).
+              additionalProperties: true
+
+    Post:
+      type: object
+      properties:
+        id: { type: integer }
+        user_id: { type: integer }
+        image_url:
+          type: string
+          description: Absolute URL to the post image.
+        caption: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        user: { $ref: '#/components/schemas/User' }
+
+    FeedPost:
+      allOf:
+        - $ref: '#/components/schemas/Post'
+        - type: object
+          properties:
+            likes_count: { type: integer }
+            comments_count: { type: integer }
+            liked_by_me: { type: boolean }
+
+    Comment:
+      type: object
+      properties:
+        id: { type: integer }
+        user_id: { type: integer }
+        post_id: { type: integer }
+        body: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        user: { $ref: '#/components/schemas/User' }
+
+    Notification:
+      type: object
+      properties:
+        id: { type: integer }
+        user_id: { type: integer, description: Recipient user id }
+        type:
+          type: string
+          enum: [like, comment, follow]
+        data:
+          type: object
+          description: Always includes `actor_id`. Includes `post_id` for like/comment; `comment_id` for comment.
+          properties:
+            actor_id: { type: integer }
+            post_id: { type: integer }
+            comment_id: { type: integer }
+          additionalProperties: true
+        read_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        actor:
+          allOf:
+            - $ref: '#/components/schemas/User'
+          description: Injected by the service layer after pagination.
+
+    LengthAwarePaginator:
+      type: object
+      description: Laravel's length-aware paginator envelope.
+      properties:
+        current_page: { type: integer }
+        data:
+          type: array
+          items: { type: object }
+        first_page_url: { type: string, nullable: true }
+        from: { type: integer, nullable: true }
+        last_page: { type: integer }
+        last_page_url: { type: string, nullable: true }
+        next_page_url: { type: string, nullable: true }
+        path: { type: string }
+        per_page: { type: integer }
+        prev_page_url: { type: string, nullable: true }
+        to: { type: integer, nullable: true }
+        total: { type: integer }
+
+    CursorPaginator:
+      type: object
+      description: Laravel's cursor paginator envelope.
+      properties:
+        data:
+          type: array
+          items: { type: object }
+        path: { type: string }
+        per_page: { type: integer }
+        next_cursor: { type: string, nullable: true }
+        next_page_url: { type: string, nullable: true }
+        prev_cursor: { type: string, nullable: true }
+        prev_page_url: { type: string, nullable: true }
