@@ -95,7 +95,6 @@ watch(() => route.query.user, () => {
     <div class="page-heading">
       <div>
         <h1>Perfil</h1>
-        <p>Perfil proprio ou de outro usuario via <code>?user=</code>, com contadores e grid de posts.</p>
       </div>
     </div>
 
