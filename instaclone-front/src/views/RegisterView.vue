@@ -21,6 +21,7 @@ async function handleSubmit() {
   errors.value = {}
 
   try {
+    // O cadastro ja autentica o usuario e leva direto para o feed.
     await authStore.register(form)
     router.push('/feed')
   } catch (incomingErrors) {
@@ -33,9 +34,7 @@ async function handleSubmit() {
   <div>
     <div class="mb-4">
       <h2 class="h3 mb-2">Criar conta</h2>
-      <p class="muted-copy mb-0">
-        Esta tela ja segue as regras de validacao do backend para nome, username e senha.
-      </p>
+      <p class="muted-copy mb-0">Crie seu perfil para publicar, seguir pessoas e montar seu feed.</p>
     </div>
 
     <form @submit.prevent="handleSubmit">

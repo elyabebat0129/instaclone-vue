@@ -1,12 +1,15 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import api from '@/services/api'
+import { extractErrorMessage } from '@/services/formatters'
 
 export const useFeedStore = defineStore('feed', () => {
   const postsById = ref({})
   const orderedIds = ref([])
   const nextCursor = ref(null)
   const loading = ref(false)
+  const error = ref('')
+  const loadingMore = ref(false)
 
   const items = computed(() => orderedIds.value.map((id) => postsById.value[id]).filter(Boolean))
 
@@ -22,6 +25,7 @@ export const useFeedStore = defineStore('feed', () => {
 
   async function fetchFeed() {
     loading.value = true
+    error.value = ''
 
     try {
       const { data } = await api.get('/feed')
@@ -29,6 +33,9 @@ export const useFeedStore = defineStore('feed', () => {
       orderedIds.value = []
       mergePosts(data.data || [])
       nextCursor.value = data.next_cursor || null
+    } catch (incomingError) {
+      error.value = extractErrorMessage(incomingError, 'Nao foi possivel carregar o feed.')
+      throw incomingError
     } finally {
       loading.value = false
     }
@@ -39,14 +46,20 @@ export const useFeedStore = defineStore('feed', () => {
       return
     }
 
-    const { data } = await api.get('/feed', {
-      params: {
-        cursor,
-      },
-    })
+    loadingMore.value = true
 
-    mergePosts(data.data || [])
-    nextCursor.value = data.next_cursor || null
+    try {
+      const { data } = await api.get('/feed', {
+        params: {
+          cursor,
+        },
+      })
+
+      mergePosts(data.data || [])
+      nextCursor.value = data.next_cursor || null
+    } finally {
+      loadingMore.value = false
+    }
   }
 
   async function toggleLike(postId) {
@@ -103,6 +116,8 @@ export const useFeedStore = defineStore('feed', () => {
     items,
     nextCursor,
     loading,
+    loadingMore,
+    error,
     fetchFeed,
     loadMoreFeed,
     toggleLike,

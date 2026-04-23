@@ -19,6 +19,7 @@ async function handleSubmit() {
   errors.value = {}
 
   try {
+    // Depois do login, respeitamos o redirect salvo pelo guard.
     await authStore.login(form)
     router.push(route.query.redirect || '/feed')
   } catch (incomingErrors) {
@@ -31,9 +32,7 @@ async function handleSubmit() {
   <div>
     <div class="mb-4">
       <h2 class="h3 mb-2">Entrar</h2>
-      <p class="muted-copy mb-0">
-        Use o login do backend Laravel para acessar as rotas protegidas.
-      </p>
+      <p class="muted-copy mb-0">Acesse sua conta para ver o feed e interagir com os posts.</p>
     </div>
 
     <form @submit.prevent="handleSubmit">

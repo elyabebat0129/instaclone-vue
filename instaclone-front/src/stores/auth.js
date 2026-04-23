@@ -88,6 +88,10 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem(TOKEN_KEY)
   }
 
+  function syncUser(nextUser) {
+    user.value = nextUser
+  }
+
   return {
     user,
     token,
@@ -98,5 +102,6 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     fetchMe,
     clearSession,
+    syncUser,
   }
 })

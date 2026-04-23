@@ -1,0 +1,11 @@
+services:
+  web:
+    container_name: instaclone-front-web
+    build:
+      context: .
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api}
+    image: projeto-final/instaclone-front
+    ports:
+      - "3000:80"
+    restart: unless-stopped

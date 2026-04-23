@@ -7,10 +7,10 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const links = [
-  { label: 'Home', to: '/feed' },
-  { label: 'Buscar', to: '/descobrir' },
-  { label: 'Criar', to: '/criar' },
-  { label: 'Perfil', to: '/perfil' },
+  { label: 'Home', to: '/feed', icon: 'bi-house-door' },
+  { label: 'Buscar', to: '/descobrir', icon: 'bi-search' },
+  { label: 'Criar', to: '/criar', icon: 'bi-plus-square' },
+  { label: 'Perfil', to: '/perfil', icon: 'bi-person-circle' },
 ]
 
 defineProps({
@@ -45,7 +45,10 @@ async function handleLogout() {
         :to="link.to"
         class="nav-pill"
       >
-        {{ link.label }}
+        <span class="d-inline-flex align-items-center gap-3">
+          <i :class="['bi', link.icon, 'nav-pill__icon']"></i>
+          <span>{{ link.label }}</span>
+        </span>
       </RouterLink>
     </nav>
 
@@ -61,7 +64,8 @@ async function handleLogout() {
       :to="link.to"
       class="mobile-nav__link"
     >
-      {{ link.label }}
+      <i :class="['bi', link.icon, 'mobile-nav__icon']"></i>
+      <span>{{ link.label }}</span>
     </RouterLink>
   </template>
 </template>
