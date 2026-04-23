@@ -4,8 +4,10 @@ import FormFieldError from '@/components/common/FormFieldError.vue'
 import { extractErrorMessage } from '@/services/formatters'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
+import { useFeedStore } from '@/stores/feed'
 
 const authStore = useAuthStore()
+const feedStore = useFeedStore()
 
 const profileForm = reactive({
   name: '',
@@ -76,6 +78,7 @@ async function saveProfile() {
     })
 
     authStore.syncUser(data)
+    feedStore.syncUserInPosts(data)
     syncFormFromUser()
     profileMessage.value = 'Perfil atualizado com sucesso.'
   } catch (error) {
@@ -111,6 +114,7 @@ async function uploadAvatar() {
     })
 
     authStore.syncUser(data)
+    feedStore.syncUserInPosts(data)
     avatarFile.value = null
     syncFormFromUser()
     avatarMessage.value = 'Avatar atualizado com sucesso.'

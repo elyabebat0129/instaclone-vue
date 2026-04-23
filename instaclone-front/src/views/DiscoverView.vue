@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import UserSuggestionCard from '@/components/common/UserSuggestionCard.vue'
 import { extractErrorMessage } from '@/services/formatters'
 import api from '@/services/api'
+import { fetchAllFollowingIds } from '@/services/users'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
@@ -20,17 +21,7 @@ const canGoBack = computed(() => pagination.currentPage > 1)
 const canGoNext = computed(() => pagination.currentPage < pagination.lastPage)
 
 async function fetchFollowing() {
-  if (!authStore.user?.id) {
-    return
-  }
-
-  const { data } = await api.get(`/users/${authStore.user.id}/following`, {
-    params: {
-      per_page: 50,
-    },
-  })
-
-  followingIds.value = new Set((data.data || []).map((item) => item.id))
+  followingIds.value = await fetchAllFollowingIds(authStore.user?.id)
 }
 
 async function fetchSuggestions(page = 1) {
@@ -88,7 +79,6 @@ onMounted(() => {
     <div class="page-heading">
       <div>
         <h1>Descobrir</h1>
-        <p>Perfis sugeridos com estado de seguir e navegacao para o perfil.</p>
       </div>
     </div>
 

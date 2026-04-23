@@ -23,14 +23,39 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
+  function syncUserInPosts(user) {
+    if (!user?.id) {
+      return
+    }
+
+    for (const postId of orderedIds.value) {
+      const post = postsById.value[postId]
+
+      if (post?.user?.id === user.id) {
+        post.user = {
+          ...post.user,
+          ...user,
+        }
+      }
+    }
+  }
+
+  function resetFeed() {
+    postsById.value = {}
+    orderedIds.value = []
+    nextCursor.value = null
+    loading.value = false
+    loadingMore.value = false
+    error.value = ''
+  }
+
   async function fetchFeed() {
     loading.value = true
     error.value = ''
 
     try {
       const { data } = await api.get('/feed')
-      postsById.value = {}
-      orderedIds.value = []
+      resetFeed()
       mergePosts(data.data || [])
       nextCursor.value = data.next_cursor || null
     } catch (incomingError) {
@@ -118,6 +143,8 @@ export const useFeedStore = defineStore('feed', () => {
     loading,
     loadingMore,
     error,
+    syncUserInPosts,
+    resetFeed,
     fetchFeed,
     loadMoreFeed,
     toggleLike,

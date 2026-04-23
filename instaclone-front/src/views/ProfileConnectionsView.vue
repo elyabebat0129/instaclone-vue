@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import ConnectionListItem from '@/components/common/ConnectionListItem.vue'
 import { extractErrorMessage } from '@/services/formatters'
 import api from '@/services/api'
+import { fetchAllFollowingIds } from '@/services/users'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -28,15 +29,7 @@ const endpointKey = computed(() => (type.value === 'seguidores' ? 'followers' : 
 const backTarget = computed(() => (isOwnProfile.value ? '/perfil' : `/perfil?user=${targetUsername.value}`))
 
 async function fetchViewerFollowing() {
-  if (!authStore.user?.id) {
-    return
-  }
-
-  const { data } = await api.get(`/users/${authStore.user.id}/following`, {
-    params: { page: 1, per_page: 50 },
-  })
-
-  followingIds.value = new Set((data.data || []).map((item) => item.id))
+  followingIds.value = await fetchAllFollowingIds(authStore.user?.id)
 }
 
 async function loadConnections(page = 1) {

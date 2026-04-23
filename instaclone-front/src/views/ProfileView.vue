@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PostGrid from '@/components/common/PostGrid.vue'
 import ProfileHero from '@/components/common/ProfileHero.vue'
 import { extractErrorMessage } from '@/services/formatters'
@@ -8,12 +8,14 @@ import api from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 
 const loading = ref(false)
 const error = ref('')
 const profile = ref(null)
 const posts = ref([])
+const postsCount = ref(0)
 const followersCount = ref(0)
 const followingCount = ref(0)
 const isFollowing = ref(false)
@@ -47,6 +49,7 @@ async function loadProfile() {
     const [postsResponse, followersResponse, followingResponse, isFollowingResponse] = await Promise.all(requests)
 
     posts.value = postsResponse.data.data || []
+    postsCount.value = postsResponse.data.total || posts.value.length
     followersCount.value = followersResponse.data.total || 0
     followingCount.value = followingResponse.data.total || 0
     isFollowing.value = isOwnProfile.value ? false : Boolean(isFollowingResponse?.data?.is_following)
@@ -81,6 +84,11 @@ async function toggleFollow() {
   }
 }
 
+async function handleLogout() {
+  await authStore.logout()
+  router.push('/login')
+}
+
 onMounted(() => {
   loadProfile().catch(() => {})
 })
@@ -109,7 +117,7 @@ watch(() => route.query.user, () => {
     <div v-else-if="profile" class="d-flex flex-column gap-4">
       <ProfileHero
         :profile="profile"
-        :posts-count="posts.length"
+        :posts-count="postsCount"
         :followers-count="followersCount"
         :following-count="followingCount"
         :is-own-profile="isOwnProfile"
@@ -121,7 +129,7 @@ watch(() => route.query.user, () => {
       <section class="surface-card">
         <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
           <h2 class="h4 mb-0">Posts</h2>
-          <div class="muted-copy small">{{ posts.length }} itens carregados</div>
+          <div class="muted-copy small">{{ postsCount }} post(s)</div>
         </div>
 
         <PostGrid v-if="posts.length" :posts="posts" />
@@ -129,6 +137,15 @@ watch(() => route.query.user, () => {
           Nenhum post encontrado para este perfil.
         </div>
       </section>
+
+      <button
+        v-if="isOwnProfile"
+        type="button"
+        class="btn btn-ghost-brand w-100 d-lg-none"
+        @click="handleLogout"
+      >
+        Sair da conta
+      </button>
     </div>
   </div>
 </template>

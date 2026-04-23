@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import api, { TOKEN_KEY } from '@/services/api'
+import { useFeedStore } from '@/stores/feed'
 
 function normalizeErrors(error) {
   if (error.response?.status === 422 && error.response?.data?.errors) {
@@ -15,6 +16,7 @@ function normalizeErrors(error) {
 }
 
 export const useAuthStore = defineStore('auth', () => {
+  const feedStore = useFeedStore()
   const user = ref(null)
   const token = ref(localStorage.getItem(TOKEN_KEY) || '')
   const loading = ref(false)
@@ -86,6 +88,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     token.value = ''
     localStorage.removeItem(TOKEN_KEY)
+    feedStore.resetFeed()
   }
 
   function syncUser(nextUser) {

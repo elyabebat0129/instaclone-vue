@@ -22,11 +22,9 @@ function ensureCommentState(postId) {
 }
 
 onMounted(() => {
-  if (!feedStore.items.length) {
-    feedStore.fetchFeed().catch((error) => {
-      pageError.value = extractErrorMessage(error, 'Nao foi possivel carregar o feed.')
-    })
-  }
+  feedStore.fetchFeed().catch((error) => {
+    pageError.value = extractErrorMessage(error, 'Nao foi possivel carregar o feed.')
+  })
 })
 
 function updateComment(postId, value) {
@@ -82,7 +80,6 @@ async function loadMore() {
     <div class="page-heading">
       <div>
         <h1>Feed</h1>
-        <p>Posts das pessoas que voce segue, com curtida e comentario inline.</p>
       </div>
     </div>
 
