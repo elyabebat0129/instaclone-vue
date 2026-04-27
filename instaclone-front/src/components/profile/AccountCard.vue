@@ -25,6 +25,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  compact: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits(['toggle-follow'])
@@ -45,18 +49,21 @@ const author = computed(() => defaultAuthor(props.user))
 
 <template>
   <article
-    class="surface-card"
-    :class="stacked ? 'h-100 d-flex flex-column gap-3' : 'd-flex justify-content-between align-items-center gap-3'"
+    class="surface-card account-card"
+    :class="[
+      stacked ? 'h-100 d-flex flex-column gap-3' : 'd-flex justify-content-between align-items-center gap-3',
+      compact ? 'account-card--compact' : '',
+    ]"
   >
-    <RouterLink :to="profileTarget" class="d-flex align-items-center gap-3">
+    <RouterLink :to="profileTarget" class="account-card__identity d-flex align-items-center gap-3">
       <img
         :src="author.avatar_url"
         :alt="author.username"
         class="suggestion-card__avatar"
       />
-      <div>
-        <div class="fw-semibold">{{ author.name }}</div>
-        <div class="muted-copy small">@{{ author.username }}</div>
+      <div class="account-card__text">
+        <div class="account-card__name fw-semibold">{{ author.name }}</div>
+        <div class="account-card__username muted-copy small">@{{ author.username }}</div>
       </div>
     </RouterLink>
 

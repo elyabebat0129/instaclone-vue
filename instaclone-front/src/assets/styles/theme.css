@@ -246,6 +246,47 @@ textarea.form-control::placeholder {
   height: 3.5rem;
 }
 
+.account-card {
+  min-width: 0;
+}
+
+.account-card__identity,
+.account-card__text {
+  min-width: 0;
+}
+
+.account-card__identity {
+  flex: 1;
+}
+
+.account-card__name,
+.account-card__username {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-card--compact {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.account-card--compact .suggestion-card__avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+}
+
+.account-card--compact .btn {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
 .post-card__image {
   width: 100%;
   max-width: 100%;

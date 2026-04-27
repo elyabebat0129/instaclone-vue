@@ -75,6 +75,7 @@ watch(() => [route.meta.navItem, authStore.user?.id], () => {
                 :is-self="true"
                 :is-following="false"
                 :busy="false"
+                compact
               />
             </section>
 
@@ -94,6 +95,7 @@ watch(() => [route.meta.navItem, authStore.user?.id], () => {
                   :is-self="user.id === authStore.user?.id"
                   :is-following="followsStore.isFollowing(user.id)"
                   :busy="followsStore.isPending(user.id)"
+                  compact
                   @toggle-follow="toggleFollow"
                 />
               </div>
