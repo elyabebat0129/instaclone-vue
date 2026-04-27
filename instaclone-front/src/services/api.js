@@ -51,14 +51,14 @@ api.interceptors.response.use(
 )
 
 export function extractErrorMessage(error, fallback = 'Nao foi possivel concluir a operacao.') {
-  // A API pode devolver erros em formatos diferentes; esta funcao pega a
+// A API pode devolver erros em formatos diferentes; esta funcao pega a
   // primeira mensagem util para mostrar na interface.
   if (error.response?.data?.errors) {
     const firstEntry = Object.values(error.response.data.errors)[0]
 
     if (Array.isArray(firstEntry) && firstEntry.length) {
       return firstEntry[0]
-    }
+    }  
   }
 
   return error.response?.data?.message || error.message || fallback
