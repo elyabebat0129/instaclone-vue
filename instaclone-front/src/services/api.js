@@ -10,6 +10,7 @@ const api = axios.create({
 })
 
 api.interceptors.request.use((config) => {
+  // Toda rota protegida recebe o Bearer token automaticamente.
   const token = localStorage.getItem(TOKEN_KEY)
 
   if (token) {
@@ -25,6 +26,7 @@ api.interceptors.response.use(
     const status = error.response?.status
 
     if (status === 401) {
+      // Quando a API invalida a sessao, limpamos o token e voltamos para login.
       localStorage.removeItem(TOKEN_KEY)
 
       if (window.location.pathname !== '/login') {

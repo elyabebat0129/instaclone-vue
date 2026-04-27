@@ -29,6 +29,7 @@ const endpointKey = computed(() => (type.value === 'seguidores' ? 'followers' : 
 const backTarget = computed(() => (isOwnProfile.value ? '/perfil' : `/perfil?user=${targetUsername.value}`))
 
 async function fetchViewerFollowing() {
+  // Lista auxiliar para saber quem ja esta sendo seguido pelo viewer.
   followingIds.value = await fetchAllFollowingIds(authStore.user?.id)
 }
 
@@ -41,6 +42,7 @@ async function loadConnections(page = 1) {
   error.value = ''
 
   try {
+    // Primeiro resolve o perfil alvo; depois carrega a lista pedida pela rota.
     const [{ data: profileData }] = await Promise.all([
       api.get(`/users/${targetUsername.value}`),
       fetchViewerFollowing(),
@@ -87,6 +89,7 @@ onMounted(() => {
 })
 
 watch(() => [route.query.user, route.params.type], () => {
+  // Reage tanto a troca de usuario quanto a troca entre seguidores e seguindo.
   loadConnections().catch(() => {})
 })
 </script>

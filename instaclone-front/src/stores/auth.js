@@ -4,6 +4,7 @@ import api, { TOKEN_KEY } from '@/services/api'
 import { useFeedStore } from '@/stores/feed'
 
 function normalizeErrors(error) {
+  // Padroniza a leitura dos erros para as views tratarem tudo do mesmo jeito.
   if (error.response?.status === 422 && error.response?.data?.errors) {
     return error.response.data.errors
   }
@@ -24,6 +25,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => Boolean(token.value))
 
   function setSession(payload) {
+    // O backend devolve access_token e user no login/cadastro.
     token.value = payload.access_token
     user.value = payload.user
     localStorage.setItem(TOKEN_KEY, payload.access_token)
@@ -63,6 +65,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     try {
+      // Reidrata o usuario autenticado a partir do token salvo.
       const { data } = await api.get('/auth/me')
       user.value = data
       return data
@@ -88,10 +91,12 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     token.value = ''
     localStorage.removeItem(TOKEN_KEY)
+    // O feed tambem precisa ser limpo para evitar posts "sobrando" entre contas.
     feedStore.resetFeed()
   }
 
   function syncUser(nextUser) {
+    // Usado quando perfil/avatar muda e precisamos refletir isso sem novo login.
     user.value = nextUser
   }
 

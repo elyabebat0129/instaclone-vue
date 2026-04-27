@@ -61,6 +61,7 @@ async function loadPost() {
   error.value = ''
 
   try {
+    // O detalhe do post e os comentarios sao carregados separadamente.
     const { data } = await api.get(`/posts/${postId.value}`)
     post.value = data
     await loadComments()
@@ -77,6 +78,7 @@ async function toggleLike() {
   }
 
   try {
+    // Reaproveita a mesma acao de like usada pelo feed.
     await feedStore.toggleLike(post.value.id)
     const { data } = await api.get(`/posts/${post.value.id}`)
     post.value = data
@@ -96,6 +98,7 @@ async function submitComment() {
   commentForm.loading = true
 
   try {
+    // Comentario novo entra no topo da lista para resposta imediata na UI.
     const { data } = await api.post(`/posts/${postId.value}/comments`, {
       body: commentForm.body.trim(),
     })
@@ -129,6 +132,7 @@ async function removeComment(commentId) {
 async function removePost() {
   try {
     await api.delete(`/posts/${postId.value}`)
+    // Depois de excluir o post, retornamos ao feed.
     router.push('/feed')
   } catch (incomingError) {
     error.value = extractErrorMessage(incomingError, 'Nao foi possivel excluir o post.')
@@ -140,6 +144,7 @@ onMounted(() => {
 })
 
 watch(() => route.params.postId, () => {
+  // Se a rota mudar para outro post, recarregamos o conteudo.
   loadPost().catch(() => {})
 })
 </script>

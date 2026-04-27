@@ -36,6 +36,7 @@ const props = defineProps({
 const emit = defineEmits(['toggle-follow'])
 
 const querySuffix = computed(() => {
+  // Preserva o username na URL quando o perfil exibido nao e o do usuario logado.
   if (props.isOwnProfile || !props.profile?.username) {
     return ''
   }
@@ -45,6 +46,7 @@ const querySuffix = computed(() => {
 </script>
 
 <template>
+  <!-- Cabecalho do perfil: avatar, bio, contadores e botao principal. -->
   <section class="surface-card">
     <div class="row g-4 align-items-center">
       <div class="col-md-auto">

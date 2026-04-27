@@ -5,6 +5,7 @@ export async function fetchAllFollowingIds(userId) {
     return new Set()
   }
 
+  // Percorre todas as paginas para sabermos exatamente quem o viewer segue.
   const ids = new Set()
   let page = 1
   let lastPage = 1

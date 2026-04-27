@@ -18,6 +18,7 @@ const errors = ref({})
 const loading = ref(false)
 
 const captionCount = computed(() => form.caption.length)
+// O botao respeita a regra visual definida nas tasks.
 const canSubmit = computed(() => Boolean(selectedImage.value) && form.caption.trim().length > 0 && !loading.value)
 
 function revokePreview() {
@@ -28,6 +29,7 @@ function revokePreview() {
 }
 
 function setFile(file) {
+  // Toda vez que a imagem muda, atualizamos a preview local.
   revokePreview()
   selectedImage.value = file
 
@@ -47,6 +49,7 @@ function handleFileChange(event) {
 
   const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
+  // A validacao do cliente evita upload invalido antes de falar com a API.
   if (!validTypes.includes(file.type)) {
     errors.value = { image: ['Selecione uma imagem JPG, JPEG, PNG ou WEBP.'] }
     event.target.value = ''
@@ -99,6 +102,7 @@ async function handleSubmit() {
 }
 
 onBeforeUnmount(() => {
+  // Evita manter blobs antigos vivos na memoria do navegador.
   revokePreview()
 })
 </script>

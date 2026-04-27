@@ -7,6 +7,7 @@ import './assets/styles/theme.css'
 
 const app = createApp(App)
 
+// Pinia e Router sao plugins globais da aplicacao.
 app.use(createPinia())
 app.use(router)
 app.mount('#app')

@@ -10,6 +10,7 @@ const likeLoadingByPost = reactive({})
 const pageError = ref('')
 
 function ensureCommentState(postId) {
+  // Cada post do feed guarda seu proprio estado de comentario inline.
   if (!commentForms[postId]) {
     commentForms[postId] = {
       body: '',
@@ -22,6 +23,7 @@ function ensureCommentState(postId) {
 }
 
 onMounted(() => {
+  // Sempre recarregamos ao entrar no feed para manter a lista consistente.
   feedStore.fetchFeed().catch((error) => {
     pageError.value = extractErrorMessage(error, 'Nao foi possivel carregar o feed.')
   })

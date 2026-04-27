@@ -36,6 +36,7 @@ async function loadProfile() {
     const { data: userData } = await api.get(`/users/${targetUsername.value}`)
     profile.value = userData
 
+    // Carregamos o restante em paralelo porque as tasks pedem contadores e grid juntos.
     const requests = [
       api.get(`/users/${userData.id}/posts`, { params: { page: 1, per_page: 24 } }),
       api.get(`/users/${userData.id}/followers`, { params: { page: 1, per_page: 1 } }),
@@ -49,6 +50,7 @@ async function loadProfile() {
     const [postsResponse, followersResponse, followingResponse, isFollowingResponse] = await Promise.all(requests)
 
     posts.value = postsResponse.data.data || []
+    // A grid mostra a primeira pagina, mas o contador exibe o total real.
     postsCount.value = postsResponse.data.total || posts.value.length
     followersCount.value = followersResponse.data.total || 0
     followingCount.value = followingResponse.data.total || 0
@@ -94,6 +96,7 @@ onMounted(() => {
 })
 
 watch(() => route.query.user, () => {
+  // Alterar o username na query deve recarregar o perfil alvo.
   loadProfile().catch(() => {})
 })
 </script>

@@ -21,6 +21,7 @@ const canGoBack = computed(() => pagination.currentPage > 1)
 const canGoNext = computed(() => pagination.currentPage < pagination.lastPage)
 
 async function fetchFollowing() {
+  // Carrega todos os ids seguidos para marcar corretamente cada card da tela.
   followingIds.value = await fetchAllFollowingIds(authStore.user?.id)
 }
 
@@ -29,6 +30,7 @@ async function fetchSuggestions(page = 1) {
   error.value = ''
 
   try {
+    // Sugestoes e ids seguidos sao buscados juntos para montar o estado do botao.
     const [{ data: suggestionsData }] = await Promise.all([
       api.get('/users/suggestions', {
         params: {
@@ -53,6 +55,7 @@ async function toggleFollow(user) {
   busyByUserId[user.id] = true
 
   try {
+    // O Set local evita nova busca completa toda vez que o follow muda.
     if (followingIds.value.has(user.id)) {
       await api.delete(`/users/${user.id}/unfollow`)
       followingIds.value.delete(user.id)
@@ -70,6 +73,7 @@ async function toggleFollow(user) {
 }
 
 onMounted(() => {
+  // A lista e carregada ao entrar na pagina.
   fetchSuggestions().catch(() => {})
 })
 </script>

@@ -98,6 +98,7 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()
 
+  // Se existe token salvo, buscamos o usuario atual antes de validar a rota.
   if (authStore.token && !authStore.user) {
     try {
       await authStore.fetchMe()
@@ -110,6 +111,7 @@ router.beforeEach(async (to) => {
     return {
       name: 'login',
       query: {
+        // Guardamos o destino para voltar a ele depois do login.
         redirect: to.fullPath,
       },
     }

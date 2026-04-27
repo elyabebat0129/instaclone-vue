@@ -3,6 +3,7 @@ export function formatRelativeTime(value) {
     return ''
   }
 
+  // Converte datas do backend em textos curtos para o feed e comentarios.
   const date = new Date(value)
   const now = new Date()
   const diffInSeconds = Math.max(1, Math.floor((now.getTime() - date.getTime()) / 1000))
@@ -33,6 +34,7 @@ export function formatRelativeTime(value) {
 }
 
 export function extractErrorMessage(error, fallback = 'Nao foi possivel concluir a operacao.') {
+  // Prioriza o primeiro erro validado do backend; se nao houver, usa a mensagem geral.
   if (error.response?.data?.errors) {
     const firstEntry = Object.values(error.response.data.errors)[0]
 

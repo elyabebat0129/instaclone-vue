@@ -35,6 +35,7 @@ function syncFormFromUser() {
 function handleAvatarChange(event) {
   avatarErrors.value = {}
   avatarMessage.value = ''
+  // Se o usuario escolher outra imagem, limpamos a preview anterior.
   cleanupPreview()
   const file = event.target.files?.[0]
 
@@ -60,6 +61,7 @@ function handleAvatarChange(event) {
 }
 
 function cleanupPreview() {
+  // Revoga apenas previews locais; URLs reais do backend nao devem ser tocadas.
   if (avatarFile.value && avatarPreview.value?.startsWith('blob:')) {
     URL.revokeObjectURL(avatarPreview.value)
   }
@@ -71,6 +73,7 @@ async function saveProfile() {
   profileLoading.value = true
 
   try {
+    // Atualiza os dados textuais do perfil.
     const { data } = await api.put('/users/me', {
       name: profileForm.name,
       username: profileForm.username,
@@ -104,6 +107,7 @@ async function uploadAvatar() {
   avatarLoading.value = true
 
   try {
+    // Avatar precisa ser enviado como multipart/form-data.
     const payload = new FormData()
     payload.append('avatar', avatarFile.value)
 
@@ -130,6 +134,7 @@ async function uploadAvatar() {
 }
 
 onMounted(() => {
+  // Ao abrir a tela, o formulario ja reflete o usuario logado.
   syncFormFromUser()
 })
 

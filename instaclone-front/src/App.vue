@@ -7,6 +7,7 @@ import AppLayout from '@/layouts/AppLayout.vue'
 const route = useRoute()
 
 const layoutComponent = computed(() => {
+  // Rotas de auth usam um layout mais simples; o restante usa a area autenticada.
   return route.meta.layout === 'auth' ? AuthLayout : AppLayout
 })
 </script>
