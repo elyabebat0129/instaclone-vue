@@ -1,9 +1,13 @@
 <script setup>
 import { computed, reactive } from 'vue'
 import { RouterLink } from 'vue-router'
-import { formatRelativeTime } from '@/services/formatters'
+import AppIcon from '@/components/layout/AppIcon.vue'
+import { ROUTE_NAMES } from '@/router/routeNames'
+import { defaultAuthor } from '@/stores/profileUtils'
+import { formatRelative } from '@/utils/dates'
 
 const props = defineProps({
+  // Props sao dados recebidos da view pai, neste caso a FeedView.
   post: {
     type: Object,
     required: true,
@@ -18,6 +22,7 @@ const props = defineProps({
   },
 })
 
+// O card nao altera a store diretamente; ele emite eventos para a tela pai decidir.
 const emit = defineEmits(['toggle-like', 'submit-comment', 'update-comment'])
 
 const fallbackState = reactive({
@@ -26,11 +31,16 @@ const fallbackState = reactive({
   error: '',
 })
 
+// computed deixa estes valores atualizados sempre que props mudarem.
 const state = computed(() => props.commentState || fallbackState)
-const profileTarget = computed(() => `/perfil?user=${props.post.user?.username || ''}`)
-const relativeTime = computed(() => formatRelativeTime(props.post.created_at))
+const author = computed(() => defaultAuthor(props.post.user))
+const profileTarget = computed(() => ({
+  name: ROUTE_NAMES.profile,
+  query: { user: author.value.username },
+}))
 
 function handleCommentSubmit() {
+  // Envia apenas o id do post; a FeedView conhece o estado do formulario.
   emit('submit-comment', props.post.id)
 }
 </script>
@@ -40,13 +50,13 @@ function handleCommentSubmit() {
     <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
       <RouterLink :to="profileTarget" class="d-flex align-items-center gap-3">
         <img
-          :src="post.user?.avatar_url || 'https://placehold.co/64x64/f4ddcf/2d241a?text=%40'"
-          :alt="post.user?.username || 'avatar'"
+          :src="author.avatar_url"
+          :alt="author.username"
           class="post-card__avatar"
         />
         <div>
-          <div class="fw-semibold">@{{ post.user?.username || 'usuario' }}</div>
-          <div class="small muted-copy">{{ relativeTime }}</div>
+          <div class="fw-semibold">@{{ author.username }}</div>
+          <div class="small muted-copy">{{ formatRelative(post.created_at) }}</div>
         </div>
       </RouterLink>
 
@@ -55,36 +65,38 @@ function handleCommentSubmit() {
       </div>
     </div>
 
-    <RouterLink :to="`/posts/${post.id}`" class="d-block mb-3">
+    <RouterLink :to="{ name: ROUTE_NAMES.postDetails, params: { postId: post.id } }" class="d-block mb-3">
       <img :src="post.image_url" alt="Post" class="post-card__image" />
     </RouterLink>
 
     <div class="post-card__actions mb-3">
+      <!-- Clique no botao avisa o pai para curtir/descurtir. -->
       <button
         type="button"
         class="post-action-btn"
         :disabled="likeLoading"
         @click="$emit('toggle-like', post.id)"
       >
-        <i :class="['bi', post.liked_by_me ? 'bi-heart-fill' : 'bi-heart']"></i>
+        <AppIcon name="heart" :filled="Boolean(post.liked_by_me)" />
       </button>
-      <RouterLink :to="`/posts/${post.id}`" class="post-action-btn">
-        <i class="bi bi-chat"></i>
+      <RouterLink :to="{ name: ROUTE_NAMES.postDetails, params: { postId: post.id } }" class="post-action-btn">
+        <AppIcon name="chat" />
       </RouterLink>
       <RouterLink :to="profileTarget" class="post-action-btn ms-auto">
-        <i class="bi bi-person"></i>
+        <AppIcon name="person" />
       </RouterLink>
     </div>
 
     <div class="mb-3">
       <div class="fw-semibold">{{ post.likes_count }} curtidas</div>
       <p class="mb-0 mt-2">
-        <strong>@{{ post.user?.username || 'usuario' }}</strong>
+        <strong>@{{ author.username }}</strong>
         {{ post.caption || 'Sem legenda.' }}
       </p>
     </div>
 
     <form class="d-flex flex-column gap-2" @submit.prevent="handleCommentSubmit">
+      <!-- O textarea recebe valor via prop e avisa mudancas por evento. -->
       <textarea
         :value="state.body"
         class="form-control"

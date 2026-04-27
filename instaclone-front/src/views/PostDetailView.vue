@@ -1,10 +1,18 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { extractErrorMessage, formatRelativeTime } from '@/services/formatters'
-import api from '@/services/api'
+import AppIcon from '@/components/layout/AppIcon.vue'
+import PostCommentForm from '@/components/feed/PostCommentForm.vue'
+import PostCommentList from '@/components/feed/PostCommentList.vue'
+import { ROUTE_NAMES } from '@/router/routeNames'
+import { extractErrorMessage } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
+import { createPostComment, deleteComment, getPostComments } from '@/services/comments.service'
 import { useFeedStore } from '@/stores/feed'
+import { likePost, unlikePost } from '@/services/likes.service'
+import { deletePost, getPostById } from '@/services/posts.service'
+import { defaultAuthor } from '@/stores/profileUtils'
+import { formatRelative } from '@/utils/dates'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,6 +22,7 @@ const feedStore = useFeedStore()
 const post = ref(null)
 const comments = ref([])
 const loading = ref(false)
+const likeLoading = ref(false)
 const commentsLoading = ref(false)
 const loadingMore = ref(false)
 const error = ref('')
@@ -29,6 +38,7 @@ const pagination = reactive({
 
 const postId = computed(() => route.params.postId)
 const isOwner = computed(() => post.value?.user_id === authStore.user?.id)
+const author = computed(() => defaultAuthor(post.value?.user))
 
 async function loadComments(page = 1, append = false) {
   if (!postId.value) {
@@ -42,9 +52,9 @@ async function loadComments(page = 1, append = false) {
   }
 
   try {
-    // Quando append=true, acumulamos a proxima pagina abaixo da lista atual.
-    const { data } = await api.get(`/posts/${postId.value}/comments`, {
-      params: { page, per_page: 10 },
+    const data = await getPostComments(postId.value, {
+      page,
+      per_page: 10,
     })
 
     comments.value = append ? [...comments.value, ...(data.data || [])] : data.data || []
@@ -61,8 +71,7 @@ async function loadPost() {
   error.value = ''
 
   try {
-    // O detalhe do post e os comentarios sao carregados separadamente.
-    const { data } = await api.get(`/posts/${postId.value}`)
+    const data = await getPostById(postId.value)
     post.value = data
     await loadComments()
   } catch (incomingError) {
@@ -77,13 +86,34 @@ async function toggleLike() {
     return
   }
 
+  const previousLiked = Boolean(post.value.liked_by_me)
+  const previousCount = post.value.likes_count
+  likeLoading.value = true
+  post.value.liked_by_me = !previousLiked
+  post.value.likes_count += previousLiked ? -1 : 1
+
   try {
-    // Reaproveita a mesma acao de like usada pelo feed.
-    await feedStore.toggleLike(post.value.id)
-    const { data } = await api.get(`/posts/${post.value.id}`)
-    post.value = data
+    const response = previousLiked
+      ? await unlikePost(post.value.id)
+      : await likePost(post.value.id)
+
+    post.value.liked_by_me = Boolean(response?.liked)
+    post.value.likes_count = typeof response?.likes_count === 'number'
+      ? response.likes_count
+      : post.value.likes_count
+
+    const feedPost = feedStore.postsById[post.value.id]
+
+    if (feedPost) {
+      feedPost.liked_by_me = post.value.liked_by_me
+      feedPost.likes_count = post.value.likes_count
+    }
   } catch (incomingError) {
+    post.value.liked_by_me = previousLiked
+    post.value.likes_count = previousCount
     error.value = extractErrorMessage(incomingError, 'Nao foi possivel atualizar a curtida.')
+  } finally {
+    likeLoading.value = false
   }
 }
 
@@ -98,11 +128,7 @@ async function submitComment() {
   commentForm.loading = true
 
   try {
-    // Comentario novo entra no topo da lista para resposta imediata na UI.
-    const { data } = await api.post(`/posts/${postId.value}/comments`, {
-      body: commentForm.body.trim(),
-    })
-
+    const data = await createPostComment(postId.value, commentForm.body.trim())
     comments.value.unshift(data)
     commentForm.body = ''
 
@@ -118,7 +144,7 @@ async function submitComment() {
 
 async function removeComment(commentId) {
   try {
-    await api.delete(`/comments/${commentId}`)
+    await deleteComment(commentId)
     comments.value = comments.value.filter((comment) => comment.id !== commentId)
 
     if (post.value) {
@@ -131,9 +157,8 @@ async function removeComment(commentId) {
 
 async function removePost() {
   try {
-    await api.delete(`/posts/${postId.value}`)
-    // Depois de excluir o post, retornamos ao feed.
-    router.push('/feed')
+    await deletePost(postId.value)
+    router.push({ name: ROUTE_NAMES.feed })
   } catch (incomingError) {
     error.value = extractErrorMessage(incomingError, 'Nao foi possivel excluir o post.')
   }
@@ -144,7 +169,6 @@ onMounted(() => {
 })
 
 watch(() => route.params.postId, () => {
-  // Se a rota mudar para outro post, recarregamos o conteudo.
   loadPost().catch(() => {})
 })
 </script>
@@ -174,15 +198,15 @@ watch(() => route.params.postId, () => {
 
         <div class="post-detail-shell__side">
           <div class="post-detail-shell__header">
-            <RouterLink :to="`/perfil?user=${post.user?.username || ''}`" class="d-flex align-items-center gap-3">
+            <RouterLink :to="{ name: ROUTE_NAMES.profile, query: { user: author.username } }" class="d-flex align-items-center gap-3">
               <img
-                :src="post.user?.avatar_url || 'https://placehold.co/64x64/f4ddcf/2d241a?text=%40'"
-                :alt="post.user?.username || 'perfil'"
+                :src="author.avatar_url"
+                :alt="author.username"
                 class="post-card__avatar"
               />
               <div>
-                <div class="fw-semibold">@{{ post.user?.username }}</div>
-                <div class="small muted-copy">{{ formatRelativeTime(post.created_at) }}</div>
+                <div class="fw-semibold">@{{ author.username }}</div>
+                <div class="small muted-copy">{{ formatRelative(post.created_at) }}</div>
               </div>
             </RouterLink>
 
@@ -194,51 +218,29 @@ watch(() => route.params.postId, () => {
           <div class="post-detail-shell__body">
             <div class="mb-3">
               <p class="mb-0">
-                <strong>@{{ post.user?.username }}</strong>
+                <strong>@{{ author.username }}</strong>
                 {{ post.caption || 'Sem legenda.' }}
               </p>
             </div>
 
             <div class="d-flex flex-column gap-3">
               <div v-if="commentsLoading" class="muted-copy">Carregando comentarios...</div>
-
-              <div v-else-if="comments.length" class="d-flex flex-column gap-3">
-                <article
-                  v-for="comment in comments"
-                  :key="comment.id"
-                  class="post-comment-card"
-                >
-                  <div class="d-flex justify-content-between align-items-start gap-3">
-                    <div>
-                      <div class="fw-semibold">@{{ comment.user?.username }}</div>
-                      <div class="small muted-copy">{{ formatRelativeTime(comment.created_at) }}</div>
-                    </div>
-                    <button
-                      v-if="comment.user_id === authStore.user?.id"
-                      type="button"
-                      class="btn btn-sm btn-outline-danger"
-                      @click="removeComment(comment.id)"
-                    >
-                      Excluir
-                    </button>
-                  </div>
-                  <p class="mb-0 mt-2">{{ comment.body }}</p>
-                </article>
-              </div>
-
-              <div v-else class="empty-state py-4">
-                Nenhum comentario ainda. Seja a primeira pessoa a comentar.
-              </div>
+              <PostCommentList
+                v-else
+                :comments="comments"
+                :current-user-id="authStore.user?.id"
+                @delete="removeComment"
+              />
             </div>
           </div>
 
           <div class="post-detail-shell__footer">
             <div class="post-card__actions mb-2">
-              <button type="button" class="post-action-btn" @click="toggleLike">
-                <i :class="['bi', post.liked_by_me ? 'bi-heart-fill' : 'bi-heart']"></i>
+              <button type="button" class="post-action-btn" :disabled="likeLoading" @click="toggleLike">
+                <AppIcon name="heart" :filled="Boolean(post.liked_by_me)" />
               </button>
               <button type="button" class="post-action-btn">
-                <i class="bi bi-chat"></i>
+                <AppIcon name="chat" />
               </button>
             </div>
 
@@ -247,22 +249,12 @@ watch(() => route.params.postId, () => {
               {{ post.comments_count }} comentarios
             </div>
 
-            <form class="d-flex flex-column gap-2" @submit.prevent="submitComment">
-              <textarea
-                v-model="commentForm.body"
-                class="form-control"
-                rows="3"
-                maxlength="2200"
-                placeholder="Adicione um comentario..."
-              ></textarea>
-              <div class="d-flex justify-content-between align-items-center gap-3">
-                <div v-if="commentForm.error" class="small text-danger">{{ commentForm.error }}</div>
-                <div v-else class="small muted-copy">Converse com quem tambem viu este post.</div>
-                <button type="submit" class="btn btn-brand" :disabled="commentForm.loading">
-                  {{ commentForm.loading ? 'Enviando...' : 'Comentar' }}
-                </button>
-              </div>
-            </form>
+            <PostCommentForm
+              v-model="commentForm.body"
+              :error="commentForm.error"
+              :loading="commentForm.loading"
+              @submit="submitComment"
+            />
 
             <div v-if="pagination.currentPage < pagination.lastPage" class="d-flex justify-content-end mt-3">
               <button

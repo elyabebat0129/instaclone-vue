@@ -1,23 +1,26 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { CONNECTION_LIST_TYPES, ROUTE_NAMES } from '@/router/routeNames'
 
 const routes = [
+  // Cada item representa uma URL da aplicacao e qual view deve ser carregada.
   {
     path: '/',
-    redirect: '/feed',
+    redirect: { name: ROUTE_NAMES.feed },
   },
   {
     path: '/login',
-    name: 'login',
+    name: ROUTE_NAMES.login,
     component: () => import('@/views/LoginView.vue'),
     meta: {
+      // meta guarda informacoes extras usadas pelo App.vue e pelo guard abaixo.
       layout: 'auth',
       requiresGuest: true,
     },
   },
   {
-    path: '/cadastro',
-    name: 'register',
+    path: '/register',
+    name: ROUTE_NAMES.register,
     component: () => import('@/views/RegisterView.vue'),
     meta: {
       layout: 'auth',
@@ -25,56 +28,95 @@ const routes = [
     },
   },
   {
+    path: '/cadastro',
+    redirect: { name: ROUTE_NAMES.register },
+  },
+  {
     path: '/feed',
-    name: 'feed',
+    name: ROUTE_NAMES.feed,
     component: () => import('@/views/FeedView.vue'),
     meta: {
+      // requiresAuth protege a rota; navItem ajuda a navegacao a saber onde esta.
       requiresAuth: true,
+      navItem: ROUTE_NAMES.feed,
+    },
+  },
+  {
+    path: '/discover',
+    name: ROUTE_NAMES.discover,
+    component: () => import('@/views/DiscoverView.vue'),
+    meta: {
+      requiresAuth: true,
+      navItem: ROUTE_NAMES.discover,
     },
   },
   {
     path: '/descobrir',
-    name: 'discover',
-    component: () => import('@/views/DiscoverView.vue'),
+    redirect: { name: ROUTE_NAMES.discover },
+  },
+  {
+    path: '/create',
+    name: ROUTE_NAMES.create,
+    component: () => import('@/views/CreatePostView.vue'),
     meta: {
       requiresAuth: true,
+      navItem: ROUTE_NAMES.create,
     },
   },
   {
     path: '/criar',
-    name: 'create-post',
-    component: () => import('@/views/CreatePostView.vue'),
+    redirect: { name: ROUTE_NAMES.create },
+  },
+  {
+    path: '/profile',
+    name: ROUTE_NAMES.profile,
+    component: () => import('@/views/ProfileView.vue'),
     meta: {
       requiresAuth: true,
+      navItem: ROUTE_NAMES.profile,
     },
   },
   {
     path: '/perfil',
-    name: 'profile',
-    component: () => import('@/views/ProfileView.vue'),
+    redirect: (to) => ({ name: ROUTE_NAMES.profile, query: to.query }),
+  },
+  {
+    path: '/profile/edit',
+    name: ROUTE_NAMES.profileEdit,
+    component: () => import('@/views/EditProfileView.vue'),
     meta: {
       requiresAuth: true,
+      navItem: ROUTE_NAMES.profile,
     },
   },
   {
     path: '/perfil/editar',
-    name: 'edit-profile',
-    component: () => import('@/views/EditProfileView.vue'),
+    redirect: { name: ROUTE_NAMES.profileEdit },
+  },
+  {
+    path: `/profile/list/:type(${CONNECTION_LIST_TYPES.followers}|${CONNECTION_LIST_TYPES.following})`,
+    name: ROUTE_NAMES.profileList,
+    component: () => import('@/views/ProfileConnectionsView.vue'),
     meta: {
       requiresAuth: true,
+      navItem: ROUTE_NAMES.profile,
     },
   },
   {
     path: '/perfil/lista/:type',
-    name: 'profile-list',
-    component: () => import('@/views/ProfileConnectionsView.vue'),
-    meta: {
-      requiresAuth: true,
-    },
+    redirect: (to) => ({
+      name: ROUTE_NAMES.profileList,
+      params: {
+        type: to.params.type === 'seguidores'
+          ? CONNECTION_LIST_TYPES.followers
+          : CONNECTION_LIST_TYPES.following,
+      },
+      query: to.query,
+    }),
   },
   {
     path: '/posts/:postId',
-    name: 'post-detail',
+    name: ROUTE_NAMES.postDetails,
     component: () => import('@/views/PostDetailView.vue'),
     meta: {
       requiresAuth: true,
@@ -82,7 +124,7 @@ const routes = [
   },
   {
     path: '/:pathMatch(.*)*',
-    name: 'not-found',
+    name: ROUTE_NAMES.notFound,
     component: () => import('@/views/NotFoundView.vue'),
     meta: {
       layout: 'auth',
@@ -91,34 +133,37 @@ const routes = [
 ]
 
 const router = createRouter({
+  // createWebHistory deixa as URLs limpas, sem #.
   history: createWebHistory(),
   routes,
 })
 
 router.beforeEach(async (to) => {
+  // Guard global: roda antes de toda navegacao.
   const authStore = useAuthStore()
 
-  // Se existe token salvo, buscamos o usuario atual antes de validar a rota.
   if (authStore.token && !authStore.user) {
+    // Se existe token salvo mas a store ainda nao tem usuario, tenta buscar /auth/me.
     try {
-      await authStore.fetchMe()
+      await authStore.hydrateAuthState()
     } catch {
-      // O interceptor e a store ja limpam a sessao quando necessario.
+      // A store e o interceptor ja limpam a sessao se o token for invalido.
     }
   }
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    // Rota protegida sem login volta para /login e guarda para onde o usuario queria ir.
     return {
-      name: 'login',
+      name: ROUTE_NAMES.login,
       query: {
-        // Guardamos o destino para voltar a ele depois do login.
         redirect: to.fullPath,
       },
     }
   }
 
   if (to.meta.requiresGuest && authStore.isAuthenticated) {
-    return { name: 'feed' }
+    // Usuario logado nao precisa ver login/cadastro de novo.
+    return { name: ROUTE_NAMES.feed }
   }
 
   return true

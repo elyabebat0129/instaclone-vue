@@ -2,6 +2,7 @@
 import { reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import FormFieldError from '@/components/common/FormFieldError.vue'
+import { ROUTE_NAMES } from '@/router/routeNames'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
@@ -23,7 +24,7 @@ async function handleSubmit() {
   try {
     // O cadastro ja autentica o usuario e leva direto para o feed.
     await authStore.register(form)
-    router.push('/feed')
+    router.push({ name: ROUTE_NAMES.feed })
   } catch (incomingErrors) {
     errors.value = incomingErrors
   }
@@ -91,7 +92,7 @@ async function handleSubmit() {
 
     <p class="muted-copy mt-4 mb-0 text-center">
       Ja tem conta?
-      <RouterLink to="/login" class="fw-semibold">Entrar</RouterLink>
+      <RouterLink :to="{ name: ROUTE_NAMES.login }" class="fw-semibold">Entrar</RouterLink>
     </p>
   </div>
 </template>

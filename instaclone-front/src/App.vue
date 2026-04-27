@@ -7,13 +7,15 @@ import AppLayout from '@/layouts/AppLayout.vue'
 const route = useRoute()
 
 const layoutComponent = computed(() => {
-  // Rotas de auth usam um layout mais simples; o restante usa a area autenticada.
+  // O layout muda conforme a rota atual. Login/cadastro ficam sem a estrutura
+  // da area logada; o restante usa navegacao, sidebar e conteudo principal.
   return route.meta.layout === 'auth' ? AuthLayout : AppLayout
 })
 </script>
 
 <template>
   <component :is="layoutComponent">
+    <!-- RouterView injeta aqui a view da rota atual, como FeedView ou LoginView. -->
     <RouterView v-slot="{ Component }">
       <component :is="Component" />
     </RouterView>

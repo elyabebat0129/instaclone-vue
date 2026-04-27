@@ -1,10 +1,17 @@
 <script setup>
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
+import { useImageUpload } from '@/composables/useImageUpload'
 import FormFieldError from '@/components/common/FormFieldError.vue'
-import { extractErrorMessage } from '@/services/formatters'
-import api from '@/services/api'
+import { extractErrorMessage } from '@/services/api'
+import { updateMyProfile, uploadMyAvatar } from '@/services/users.service'
 import { useAuthStore } from '@/stores/auth'
 import { useFeedStore } from '@/stores/feed'
+import {
+  PROFILE_AVATAR_MAX_MB,
+  PROFILE_BIO_MAX_LENGTH,
+  PROFILE_NAME_MAX_LENGTH,
+  PROFILE_USERNAME_MAX_LENGTH,
+} from '@/stores/profileUtils'
 
 const authStore = useAuthStore()
 const feedStore = useFeedStore()
@@ -15,66 +22,64 @@ const profileForm = reactive({
   bio: '',
 })
 
-const avatarPreview = ref('')
-const avatarFile = ref(null)
 const profileErrors = ref({})
 const avatarErrors = ref({})
 const profileLoading = ref(false)
 const avatarLoading = ref(false)
 const profileMessage = ref('')
 const avatarMessage = ref('')
+const avatarTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+const avatarUpload = useImageUpload({
+  validTypes: avatarTypes,
+  maxSizeInMb: PROFILE_AVATAR_MAX_MB,
+})
+const usernamePattern = /^[A-Za-z0-9._]+$/
 
 function syncFormFromUser() {
-  // Mantemos o formulario alinhado com o usuario salvo na store.
   profileForm.name = authStore.user?.name || ''
   profileForm.username = authStore.user?.username || ''
   profileForm.bio = authStore.user?.bio || ''
-  avatarPreview.value = authStore.user?.avatar_url || ''
+  avatarUpload.previewUrl.value = authStore.user?.avatar_url || ''
 }
 
 function handleAvatarChange(event) {
   avatarErrors.value = {}
   avatarMessage.value = ''
-  // Se o usuario escolher outra imagem, limpamos a preview anterior.
-  cleanupPreview()
-  const file = event.target.files?.[0]
+  const validation = avatarUpload.handleFileChange(event)
 
-  if (!file) {
-    avatarFile.value = null
-    return
-  }
-
-  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-
-  if (!validTypes.includes(file.type)) {
-    avatarErrors.value = { avatar: ['Envie uma imagem JPG, JPEG, PNG ou WEBP.'] }
-    return
-  }
-
-  if (file.size > 2 * 1024 * 1024) {
-    avatarErrors.value = { avatar: ['O avatar deve ter no maximo 2 MB.'] }
-    return
-  }
-
-  avatarFile.value = file
-  avatarPreview.value = URL.createObjectURL(file)
-}
-
-function cleanupPreview() {
-  // Revoga apenas previews locais; URLs reais do backend nao devem ser tocadas.
-  if (avatarFile.value && avatarPreview.value?.startsWith('blob:')) {
-    URL.revokeObjectURL(avatarPreview.value)
+  if (!validation.valid) {
+    avatarErrors.value = { avatar: validation.errors }
   }
 }
 
 async function saveProfile() {
   profileErrors.value = {}
   profileMessage.value = ''
+
+  if (profileForm.name.length > PROFILE_NAME_MAX_LENGTH) {
+    profileErrors.value = { name: [`O nome deve ter no maximo ${PROFILE_NAME_MAX_LENGTH} caracteres.`] }
+    return
+  }
+
+  if (profileForm.username.length > PROFILE_USERNAME_MAX_LENGTH) {
+    profileErrors.value = { username: [`O username deve ter no maximo ${PROFILE_USERNAME_MAX_LENGTH} caracteres.`] }
+    return
+  }
+
+  if (profileForm.username && !usernamePattern.test(profileForm.username)) {
+    profileErrors.value = { username: ['Use apenas letras, numeros, ponto e underscore no username.'] }
+    return
+  }
+
+  if (profileForm.bio.length > PROFILE_BIO_MAX_LENGTH) {
+    profileErrors.value = { bio: [`A bio deve ter no maximo ${PROFILE_BIO_MAX_LENGTH} caracteres.`] }
+    return
+  }
+
   profileLoading.value = true
 
   try {
-    // Atualiza os dados textuais do perfil.
-    const { data } = await api.put('/users/me', {
+    const data = await updateMyProfile({
       name: profileForm.name,
       username: profileForm.username,
       bio: profileForm.bio,
@@ -95,11 +100,11 @@ async function saveProfile() {
   }
 }
 
-async function uploadAvatar() {
+async function saveAvatar() {
   avatarErrors.value = {}
   avatarMessage.value = ''
 
-  if (!avatarFile.value) {
+  if (!avatarUpload.file.value) {
     avatarErrors.value = { avatar: ['Selecione uma imagem antes de enviar.'] }
     return
   }
@@ -107,19 +112,14 @@ async function uploadAvatar() {
   avatarLoading.value = true
 
   try {
-    // Avatar precisa ser enviado como multipart/form-data.
     const payload = new FormData()
-    payload.append('avatar', avatarFile.value)
+    payload.append('avatar', avatarUpload.file.value)
 
-    const { data } = await api.post('/users/me/avatar', payload, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    })
+    const data = await uploadMyAvatar(payload)
 
     authStore.syncUser(data)
     feedStore.syncUserInPosts(data)
-    avatarFile.value = null
+    avatarUpload.file.value = null
     syncFormFromUser()
     avatarMessage.value = 'Avatar atualizado com sucesso.'
   } catch (error) {
@@ -134,12 +134,7 @@ async function uploadAvatar() {
 }
 
 onMounted(() => {
-  // Ao abrir a tela, o formulario ja reflete o usuario logado.
   syncFormFromUser()
-})
-
-onBeforeUnmount(() => {
-  cleanupPreview()
 })
 </script>
 
@@ -157,7 +152,7 @@ onBeforeUnmount(() => {
         <div class="surface-card h-100 d-flex flex-column gap-3">
           <h2 class="h4 mb-0">Avatar</h2>
           <img
-            :src="avatarPreview || 'https://placehold.co/240x240/f4ddcf/2d241a?text=%40'"
+            :src="avatarUpload.previewUrl.value || 'https://placehold.co/240x240/f4ddcf/2d241a?text=%40'"
             alt="Avatar atual"
             class="post-card__image"
           />
@@ -169,7 +164,7 @@ onBeforeUnmount(() => {
           />
           <FormFieldError :errors="avatarErrors.avatar" />
           <div v-if="avatarMessage" class="small text-success">{{ avatarMessage }}</div>
-          <button type="button" class="btn btn-brand" :disabled="avatarLoading" @click="uploadAvatar">
+          <button type="button" class="btn btn-brand" :disabled="avatarLoading" @click="saveAvatar">
             {{ avatarLoading ? 'Enviando...' : 'Salvar avatar' }}
           </button>
         </div>
@@ -181,7 +176,13 @@ onBeforeUnmount(() => {
 
           <div>
             <label class="form-label" for="profile-name">Nome</label>
-            <input id="profile-name" v-model="profileForm.name" type="text" class="form-control" maxlength="255" />
+            <input
+              id="profile-name"
+              v-model="profileForm.name"
+              type="text"
+              class="form-control"
+              :maxlength="PROFILE_NAME_MAX_LENGTH"
+            />
             <FormFieldError :errors="profileErrors.name" />
           </div>
 
@@ -192,7 +193,7 @@ onBeforeUnmount(() => {
               v-model="profileForm.username"
               type="text"
               class="form-control"
-              maxlength="30"
+              :maxlength="PROFILE_USERNAME_MAX_LENGTH"
             />
             <FormFieldError :errors="profileErrors.username" />
           </div>
@@ -203,10 +204,10 @@ onBeforeUnmount(() => {
               id="profile-bio"
               v-model="profileForm.bio"
               rows="5"
-              maxlength="500"
+              :maxlength="PROFILE_BIO_MAX_LENGTH"
               class="form-control"
             ></textarea>
-            <div class="small muted-copy mt-2">{{ profileForm.bio.length }} / 500</div>
+            <div class="small muted-copy mt-2">{{ profileForm.bio.length }} / {{ PROFILE_BIO_MAX_LENGTH }}</div>
             <FormFieldError :errors="profileErrors.bio" />
           </div>
 

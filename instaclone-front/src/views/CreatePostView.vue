@@ -1,76 +1,50 @@
 <script setup>
-import { computed, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useImageUpload } from '@/composables/useImageUpload'
 import FormFieldError from '@/components/common/FormFieldError.vue'
-import { extractErrorMessage } from '@/services/formatters'
+import { ROUTE_NAMES } from '@/router/routeNames'
+import { extractErrorMessage } from '@/services/api'
+import { POST_CAPTION_MAX_LENGTH, POST_IMAGE_MAX_MB } from '@/stores/profileUtils'
 import { useFeedStore } from '@/stores/feed'
 
 const router = useRouter()
 const feedStore = useFeedStore()
 
+// Formulario simples: legenda fica reativa e a imagem fica no composable.
 const form = reactive({
   caption: '',
 })
 
-const selectedImage = ref(null)
-const previewUrl = ref('')
 const errors = ref({})
 const loading = ref(false)
+const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
+// useImageUpload concentra preview, validacao de tipo e limite de tamanho.
+const imageUpload = useImageUpload({
+  validTypes,
+  maxSizeInMb: POST_IMAGE_MAX_MB,
+})
+
+// Valores derivados do estado atual do formulario.
 const captionCount = computed(() => form.caption.length)
-// O botao respeita a regra visual definida nas tasks.
-const canSubmit = computed(() => Boolean(selectedImage.value) && form.caption.trim().length > 0 && !loading.value)
-
-function revokePreview() {
-  if (previewUrl.value) {
-    URL.revokeObjectURL(previewUrl.value)
-    previewUrl.value = ''
-  }
-}
-
-function setFile(file) {
-  // Toda vez que a imagem muda, atualizamos a preview local.
-  revokePreview()
-  selectedImage.value = file
-
-  if (file) {
-    previewUrl.value = URL.createObjectURL(file)
-  }
-}
+const canSubmit = computed(() => imageUpload.hasFile.value && form.caption.trim().length > 0 && !loading.value)
 
 function handleFileChange(event) {
+  // Valida o arquivo assim que o usuario seleciona a imagem.
   errors.value = {}
-  const file = event.target.files?.[0]
+  const validation = imageUpload.handleFileChange(event)
 
-  if (!file) {
-    setFile(null)
-    return
+  if (!validation.valid) {
+    errors.value = { image: validation.errors }
   }
-
-  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-
-  // A validacao do cliente evita upload invalido antes de falar com a API.
-  if (!validTypes.includes(file.type)) {
-    errors.value = { image: ['Selecione uma imagem JPG, JPEG, PNG ou WEBP.'] }
-    event.target.value = ''
-    setFile(null)
-    return
-  }
-
-  if (file.size > 5 * 1024 * 1024) {
-    errors.value = { image: ['A imagem deve ter no maximo 5 MB.'] }
-    event.target.value = ''
-    setFile(null)
-    return
-  }
-
-  setFile(file)
 }
 
 async function handleSubmit() {
+  // Valida no front antes de enviar para a API.
   errors.value = {}
 
-  if (!selectedImage.value) {
+  if (!imageUpload.file.value) {
     errors.value = { image: ['Selecione uma imagem para publicar.'] }
     return
   }
@@ -83,13 +57,14 @@ async function handleSubmit() {
   loading.value = true
 
   try {
-    // O backend espera multipart com imagem e legenda.
+    // Upload de arquivo precisa ir em FormData, nao em JSON comum.
     const payload = new FormData()
-    payload.append('image', selectedImage.value)
+    payload.append('image', imageUpload.file.value)
     payload.append('caption', form.caption.trim())
 
     await feedStore.createPost(payload)
-    router.push('/feed')
+    // Depois de publicar, volta para o feed onde o post ja entra no estado local.
+    router.push({ name: ROUTE_NAMES.feed })
   } catch (error) {
     if (error.response?.status === 422 && error.response?.data?.errors) {
       errors.value = error.response.data.errors
@@ -100,11 +75,6 @@ async function handleSubmit() {
     loading.value = false
   }
 }
-
-onBeforeUnmount(() => {
-  // Evita manter blobs antigos vivos na memoria do navegador.
-  revokePreview()
-})
 </script>
 
 <template>
@@ -129,8 +99,9 @@ onBeforeUnmount(() => {
           />
           <FormFieldError :errors="errors.image" />
 
-          <div v-if="previewUrl" class="mt-4">
-            <img :src="previewUrl" alt="Preview do post" class="post-card__image" />
+          <div v-if="imageUpload.previewUrl.value" class="mt-4">
+            <!-- Preview local antes do envio para a API. -->
+            <img :src="imageUpload.previewUrl.value" alt="Preview do post" class="post-card__image" />
           </div>
           <div v-else class="empty-state mt-4">
             A preview aparece aqui depois que voce seleciona uma imagem.
@@ -149,16 +120,17 @@ onBeforeUnmount(() => {
 
           <div>
             <label class="form-label" for="caption">Legenda</label>
+            <!-- v-model mantem textarea e form.caption sincronizados. -->
             <textarea
               id="caption"
               v-model="form.caption"
               class="form-control"
               rows="8"
-              maxlength="2200"
+              :maxlength="POST_CAPTION_MAX_LENGTH"
               placeholder="Escreva uma legenda para o post..."
             ></textarea>
             <div class="small muted-copy mt-2">
-              {{ captionCount }} / 2200
+              {{ captionCount }} / {{ POST_CAPTION_MAX_LENGTH }}
             </div>
             <FormFieldError :errors="errors.caption" />
           </div>

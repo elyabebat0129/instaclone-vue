@@ -17,12 +17,39 @@ fi
 
 if [ "${DB_CONNECTION:-}" = "mysql" ] && [ -n "${DB_HOST:-}" ]; then
     echo "Waiting for MySQL at ${DB_HOST}:${DB_PORT:-3306}..."
+    db_ready=false
+
     for i in $(seq 1 60); do
-        if mysqladmin ping -h "${DB_HOST}" -P "${DB_PORT:-3306}" -u "${DB_USERNAME:-root}" -p"${DB_PASSWORD:-}" --silent >/dev/null 2>&1; then
+        if php -r '
+            $host = getenv("DB_HOST") ?: "127.0.0.1";
+            $port = getenv("DB_PORT") ?: "3306";
+            $database = getenv("DB_DATABASE") ?: "";
+            $username = getenv("DB_USERNAME") ?: "root";
+            $password = getenv("DB_PASSWORD") ?: "";
+
+            try {
+                new PDO(
+                    "mysql:host={$host};port={$port};dbname={$database}",
+                    $username,
+                    $password,
+                    [PDO::ATTR_TIMEOUT => 2],
+                );
+                exit(0);
+            } catch (Throwable $exception) {
+                exit(1);
+            }
+        ' >/dev/null 2>&1; then
+            db_ready=true
             break
         fi
+
         sleep 1
     done
+
+    if [ "${db_ready}" != "true" ]; then
+        echo "MySQL did not become ready in time."
+        exit 1
+    fi
 fi
 
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then

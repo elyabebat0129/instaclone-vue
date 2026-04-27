@@ -2,27 +2,33 @@
 import { reactive, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import FormFieldError from '@/components/common/FormFieldError.vue'
+import { ROUTE_NAMES } from '@/router/routeNames'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
+// route le a URL atual; router faz a navegacao depois do login.
 const route = useRoute()
 const router = useRouter()
 
+// reactive e usado aqui porque o formulario tem mais de um campo relacionado.
 const form = reactive({
   email: '',
   password: '',
 })
 
+// errors fica separado do form para guardar mensagens vindas da API.
 const errors = ref({})
 
 async function handleSubmit() {
+  // Limpa erros antigos antes de uma nova tentativa.
   errors.value = {}
 
   try {
     // Depois do login, respeitamos o redirect salvo pelo guard.
     await authStore.login(form)
-    router.push(route.query.redirect || '/feed')
+    router.push(route.query.redirect || { name: ROUTE_NAMES.feed })
   } catch (incomingErrors) {
+    // A store ja devolve os erros em formato que o template consegue exibir.
     errors.value = incomingErrors
   }
 }
@@ -36,6 +42,7 @@ async function handleSubmit() {
     </div>
 
     <form @submit.prevent="handleSubmit">
+      <!-- v-model liga o input ao objeto form de forma reativa. -->
       <div class="mb-3">
         <label class="form-label" for="email">Email</label>
         <input id="email" v-model="form.email" type="email" class="form-control" />
@@ -55,6 +62,7 @@ async function handleSubmit() {
 
       <FormFieldError :errors="errors.general" />
 
+      <!-- O loading vem da store para impedir envio duplicado durante a requisicao. -->
       <button type="submit" class="btn btn-brand w-100" :disabled="authStore.loading">
         {{ authStore.loading ? 'Entrando...' : 'Entrar' }}
       </button>
@@ -62,7 +70,7 @@ async function handleSubmit() {
 
     <p class="muted-copy mt-4 mb-0 text-center">
       Ainda nao tem conta?
-      <RouterLink to="/cadastro" class="fw-semibold">Criar cadastro</RouterLink>
+      <RouterLink :to="{ name: ROUTE_NAMES.register }" class="fw-semibold">Criar cadastro</RouterLink>
     </p>
   </div>
 </template>

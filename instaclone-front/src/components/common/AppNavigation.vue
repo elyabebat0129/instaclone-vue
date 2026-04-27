@@ -1,16 +1,18 @@
 <script setup>
 import { computed } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import AppIcon from '@/components/layout/AppIcon.vue'
+import { ROUTE_NAMES } from '@/router/routeNames'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 const links = [
-  { label: 'Home', to: '/feed', icon: 'bi-house-door' },
-  { label: 'Buscar', to: '/descobrir', icon: 'bi-search' },
-  { label: 'Criar', to: '/criar', icon: 'bi-plus-square' },
-  { label: 'Perfil', to: '/perfil', icon: 'bi-person-circle' },
+  { label: 'Home', name: ROUTE_NAMES.feed, icon: 'home' },
+  { label: 'Buscar', name: ROUTE_NAMES.discover, icon: 'search' },
+  { label: 'Criar', name: ROUTE_NAMES.create, icon: 'plusSquare' },
+  { label: 'Perfil', name: ROUTE_NAMES.profile, icon: 'person' },
 ]
 
 defineProps({
@@ -24,7 +26,7 @@ const username = computed(() => authStore.user?.username || 'usuario')
 
 async function handleLogout() {
   await authStore.logout()
-  router.push('/login')
+  router.push({ name: ROUTE_NAMES.login })
 }
 </script>
 
@@ -41,12 +43,12 @@ async function handleLogout() {
     <nav class="d-flex flex-column gap-2">
       <RouterLink
         v-for="link in links"
-        :key="link.to"
-        :to="link.to"
+        :key="link.name"
+        :to="{ name: link.name }"
         class="nav-pill"
       >
         <span class="d-inline-flex align-items-center gap-3">
-          <i :class="['bi', link.icon, 'nav-pill__icon']"></i>
+          <AppIcon :name="link.icon" class="nav-pill__icon" />
           <span>{{ link.label }}</span>
         </span>
       </RouterLink>
@@ -60,11 +62,11 @@ async function handleLogout() {
   <template v-else>
     <RouterLink
       v-for="link in links"
-      :key="link.to"
-      :to="link.to"
+      :key="link.name"
+      :to="{ name: link.name }"
       class="mobile-nav__link"
     >
-      <i :class="['bi', link.icon, 'mobile-nav__icon']"></i>
+      <AppIcon :name="link.icon" class="mobile-nav__icon" />
       <span>{{ link.label }}</span>
     </RouterLink>
   </template>

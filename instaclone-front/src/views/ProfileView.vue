@@ -1,15 +1,20 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import PostGrid from '@/components/common/PostGrid.vue'
-import ProfileHero from '@/components/common/ProfileHero.vue'
-import { extractErrorMessage } from '@/services/formatters'
-import api from '@/services/api'
+import ProfileHeader from '@/components/profile/ProfileHeader.vue'
+import ProfilePostGrid from '@/components/profile/ProfilePostGrid.vue'
+import ProfileSummaryCards from '@/components/profile/ProfileSummaryCards.vue'
+import { ROUTE_NAMES } from '@/router/routeNames'
+import { extractErrorMessage } from '@/services/api'
+import { getIsFollowing, getUserByUsername, getUserFollowers, getUserFollowing, getUserPosts } from '@/services/users.service'
 import { useAuthStore } from '@/stores/auth'
+import { useFollowsStore } from '@/stores/follows'
+import { defaultAuthor } from '@/stores/profileUtils'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const followsStore = useFollowsStore()
 
 const loading = ref(false)
 const error = ref('')
@@ -33,28 +38,27 @@ async function loadProfile() {
   error.value = ''
 
   try {
-    const { data: userData } = await api.get(`/users/${targetUsername.value}`)
-    profile.value = userData
+    const userData = await getUserByUsername(targetUsername.value)
+    profile.value = defaultAuthor(userData)
 
-    // Carregamos o restante em paralelo porque as tasks pedem contadores e grid juntos.
     const requests = [
-      api.get(`/users/${userData.id}/posts`, { params: { page: 1, per_page: 24 } }),
-      api.get(`/users/${userData.id}/followers`, { params: { page: 1, per_page: 1 } }),
-      api.get(`/users/${userData.id}/following`, { params: { page: 1, per_page: 1 } }),
+      getUserPosts(userData.id, { page: 1, per_page: 24 }),
+      getUserFollowers(userData.id, { page: 1, per_page: 1 }),
+      getUserFollowing(userData.id, { page: 1, per_page: 1 }),
+      followsStore.hydrateFollowingIds(authStore.user?.id),
     ]
 
     if (!isOwnProfile.value) {
-      requests.push(api.get(`/users/${userData.id}/is-following`))
+      requests.push(getIsFollowing(userData.id))
     }
 
-    const [postsResponse, followersResponse, followingResponse, isFollowingResponse] = await Promise.all(requests)
+    const [postsResponse, followersResponse, followingResponse, _viewerFollowing, isFollowingResponse] = await Promise.all(requests)
 
-    posts.value = postsResponse.data.data || []
-    // A grid mostra a primeira pagina, mas o contador exibe o total real.
-    postsCount.value = postsResponse.data.total || posts.value.length
-    followersCount.value = followersResponse.data.total || 0
-    followingCount.value = followingResponse.data.total || 0
-    isFollowing.value = isOwnProfile.value ? false : Boolean(isFollowingResponse?.data?.is_following)
+    posts.value = postsResponse.data || []
+    postsCount.value = postsResponse.total || posts.value.length
+    followersCount.value = followersResponse.total || 0
+    followingCount.value = followingResponse.total || 0
+    isFollowing.value = isOwnProfile.value ? false : Boolean(isFollowingResponse?.is_following)
   } catch (incomingError) {
     error.value = extractErrorMessage(incomingError, 'Nao foi possivel carregar este perfil.')
   } finally {
@@ -70,14 +74,13 @@ async function toggleFollow() {
   followBusy.value = true
 
   try {
+    await followsStore.toggleFollow(profile.value.id)
+    isFollowing.value = followsStore.isFollowing(profile.value.id)
+
     if (isFollowing.value) {
-      await api.delete(`/users/${profile.value.id}/unfollow`)
-      isFollowing.value = false
-      followersCount.value = Math.max(0, followersCount.value - 1)
-    } else {
-      await api.post(`/users/${profile.value.id}/follow`)
-      isFollowing.value = true
       followersCount.value += 1
+    } else {
+      followersCount.value = Math.max(0, followersCount.value - 1)
     }
   } catch (incomingError) {
     error.value = extractErrorMessage(incomingError, 'Nao foi possivel atualizar o follow.')
@@ -88,7 +91,7 @@ async function toggleFollow() {
 
 async function handleLogout() {
   await authStore.logout()
-  router.push('/login')
+  router.push({ name: ROUTE_NAMES.login })
 }
 
 onMounted(() => {
@@ -96,7 +99,6 @@ onMounted(() => {
 })
 
 watch(() => route.query.user, () => {
-  // Alterar o username na query deve recarregar o perfil alvo.
   loadProfile().catch(() => {})
 })
 </script>
@@ -118,16 +120,37 @@ watch(() => route.query.user, () => {
     </div>
 
     <div v-else-if="profile" class="d-flex flex-column gap-4">
-      <ProfileHero
-        :profile="profile"
-        :posts-count="postsCount"
-        :followers-count="followersCount"
-        :following-count="followingCount"
-        :is-own-profile="isOwnProfile"
-        :is-following="isFollowing"
-        :busy="followBusy"
-        @toggle-follow="toggleFollow"
-      />
+      <section class="surface-card">
+        <div class="row g-4 align-items-center">
+          <div class="col-md-auto">
+            <img
+              :src="profile.avatar_url"
+              :alt="profile.username"
+              class="profile-hero__avatar"
+            />
+          </div>
+
+          <div class="col">
+            <div class="d-flex flex-column gap-3">
+              <ProfileHeader
+                :profile="profile"
+                :is-own-profile="isOwnProfile"
+                :is-following="isFollowing"
+                :busy="followBusy"
+                @toggle-follow="toggleFollow"
+              />
+              <p class="mb-0">{{ profile.bio || 'Este perfil ainda nao adicionou uma bio.' }}</p>
+              <ProfileSummaryCards
+                :username="profile.username"
+                :posts-count="postsCount"
+                :followers-count="followersCount"
+                :following-count="followingCount"
+                :is-own-profile="isOwnProfile"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section class="surface-card">
         <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
@@ -135,7 +158,7 @@ watch(() => route.query.user, () => {
           <div class="muted-copy small">{{ postsCount }} post(s)</div>
         </div>
 
-        <PostGrid v-if="posts.length" :posts="posts" />
+        <ProfilePostGrid v-if="posts.length" :posts="posts" />
         <div v-else class="empty-state">
           Nenhum post encontrado para este perfil.
         </div>

@@ -1,16 +1,21 @@
 import axios from 'axios'
+import { getActivePinia } from 'pinia'
+import { useAuthStore } from '@/stores/auth'
 
 const TOKEN_KEY = 'instaclone.token'
 
+// Instancia central do Axios. Os services importam este objeto para nao
+// repetir baseURL, headers e regras de autenticacao em cada requisicao.
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
   headers: {
     Accept: 'application/json',
   },
 })
 
 api.interceptors.request.use((config) => {
-  // Toda rota protegida recebe o Bearer token automaticamente.
+  // Antes de cada request, tentamos anexar o token salvo no navegador.
+  // Assim as telas nao precisam lembrar de enviar Authorization manualmente.
   const token = localStorage.getItem(TOKEN_KEY)
 
   if (token) {
@@ -26,8 +31,15 @@ api.interceptors.response.use(
     const status = error.response?.status
 
     if (status === 401) {
-      // Quando a API invalida a sessao, limpamos o token e voltamos para login.
-      localStorage.removeItem(TOKEN_KEY)
+      // 401 indica sessao invalida/expirada. Limpamos o estado local para
+      // evitar que o front continue exibindo dados de um usuario sem sessao.
+      const activePinia = getActivePinia()
+
+      if (activePinia) {
+        useAuthStore(activePinia).clearSession()
+      } else {
+        localStorage.removeItem(TOKEN_KEY)
+      }
 
       if (window.location.pathname !== '/login') {
         window.location.assign('/login')
@@ -37,6 +49,20 @@ api.interceptors.response.use(
     return Promise.reject(error)
   },
 )
+
+export function extractErrorMessage(error, fallback = 'Nao foi possivel concluir a operacao.') {
+  // A API pode devolver erros em formatos diferentes; esta funcao pega a
+  // primeira mensagem util para mostrar na interface.
+  if (error.response?.data?.errors) {
+    const firstEntry = Object.values(error.response.data.errors)[0]
+
+    if (Array.isArray(firstEntry) && firstEntry.length) {
+      return firstEntry[0]
+    }
+  }
+
+  return error.response?.data?.message || error.message || fallback
+}
 
 export { TOKEN_KEY }
 export default api

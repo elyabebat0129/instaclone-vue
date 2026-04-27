@@ -7,7 +7,10 @@ import './assets/styles/theme.css'
 
 const app = createApp(App)
 
-// Pinia e Router sao plugins globais da aplicacao.
+// A aplicacao nasce em App.vue e recebe os plugins que todas as telas usam.
+// Pinia cuida dos estados globais; Router cuida da navegacao entre views.
 app.use(createPinia())
 app.use(router)
+
+// O Vue assume o controle da div #app que existe no index.html.
 app.mount('#app')

@@ -1,44 +1,35 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import UserSuggestionCard from '@/components/common/UserSuggestionCard.vue'
-import { extractErrorMessage } from '@/services/formatters'
-import api from '@/services/api'
-import { fetchAllFollowingIds } from '@/services/users'
+import AccountCard from '@/components/profile/AccountCard.vue'
+import { extractErrorMessage } from '@/services/api'
+import { getUserSuggestions } from '@/services/users.service'
 import { useAuthStore } from '@/stores/auth'
+import { useFollowsStore } from '@/stores/follows'
 
 const authStore = useAuthStore()
+const followsStore = useFollowsStore()
 const suggestions = ref([])
 const pagination = reactive({
   currentPage: 1,
   lastPage: 1,
 })
-const followingIds = ref(new Set())
-const busyByUserId = reactive({})
 const loading = ref(false)
 const error = ref('')
 
 const canGoBack = computed(() => pagination.currentPage > 1)
 const canGoNext = computed(() => pagination.currentPage < pagination.lastPage)
 
-async function fetchFollowing() {
-  // Carrega todos os ids seguidos para marcar corretamente cada card da tela.
-  followingIds.value = await fetchAllFollowingIds(authStore.user?.id)
-}
-
 async function fetchSuggestions(page = 1) {
   loading.value = true
   error.value = ''
 
   try {
-    // Sugestoes e ids seguidos sao buscados juntos para montar o estado do botao.
-    const [{ data: suggestionsData }] = await Promise.all([
-      api.get('/users/suggestions', {
-        params: {
-          page,
-          per_page: 9,
-        },
+    const [suggestionsData] = await Promise.all([
+      getUserSuggestions({
+        page,
+        per_page: 9,
       }),
-      fetchFollowing(),
+      followsStore.hydrateFollowingIds(authStore.user?.id),
     ])
 
     suggestions.value = suggestionsData.data || []
@@ -52,28 +43,14 @@ async function fetchSuggestions(page = 1) {
 }
 
 async function toggleFollow(user) {
-  busyByUserId[user.id] = true
-
   try {
-    // O Set local evita nova busca completa toda vez que o follow muda.
-    if (followingIds.value.has(user.id)) {
-      await api.delete(`/users/${user.id}/unfollow`)
-      followingIds.value.delete(user.id)
-    } else {
-      await api.post(`/users/${user.id}/follow`)
-      followingIds.value.add(user.id)
-    }
-
-    followingIds.value = new Set(followingIds.value)
+    await followsStore.toggleFollow(user.id)
   } catch (incomingError) {
     error.value = extractErrorMessage(incomingError, 'Nao foi possivel atualizar o follow.')
-  } finally {
-    busyByUserId[user.id] = false
   }
 }
 
 onMounted(() => {
-  // A lista e carregada ao entrar na pagina.
   fetchSuggestions().catch(() => {})
 })
 </script>
@@ -97,10 +74,11 @@ onMounted(() => {
     <div v-else-if="suggestions.length" class="d-flex flex-column gap-4">
       <div class="row g-4">
         <div v-for="user in suggestions" :key="user.id" class="col-md-6 col-xl-4">
-          <UserSuggestionCard
+          <AccountCard
             :user="user"
-            :is-following="followingIds.has(user.id)"
-            :busy="Boolean(busyByUserId[user.id])"
+            :stacked="true"
+            :is-following="followsStore.isFollowing(user.id)"
+            :busy="followsStore.isPending(user.id)"
             :is-self="user.id === authStore.user?.id"
             @toggle-follow="toggleFollow"
           />

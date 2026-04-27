@@ -1,9 +1,14 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import api from '@/services/api'
-import { extractErrorMessage } from '@/services/formatters'
+import { extractErrorMessage } from '@/services/api'
+import { createPostComment } from '@/services/comments.service'
+import { getFeed } from '@/services/feed.service'
+import { likePost, unlikePost } from '@/services/likes.service'
+import { createPostRequest } from '@/services/posts.service'
+import { defaultAuthor } from '@/stores/profileUtils'
 
 export const useFeedStore = defineStore('feed', () => {
+  // postsById facilita atualizar um post especifico; orderedIds preserva a ordem do feed.
   const postsById = ref({})
   const orderedIds = ref([])
   const nextCursor = ref(null)
@@ -15,8 +20,12 @@ export const useFeedStore = defineStore('feed', () => {
   const items = computed(() => orderedIds.value.map((id) => postsById.value[id]).filter(Boolean))
 
   function mergePosts(posts) {
+    // Mescla posts novos com os ja carregados sem duplicar ids.
     for (const post of posts) {
-      postsById.value[post.id] = post
+      postsById.value[post.id] = {
+        ...post,
+        user: post.user || defaultAuthor(),
+      }
 
       if (!orderedIds.value.includes(post.id)) {
         orderedIds.value.push(post.id)
@@ -24,7 +33,16 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
+  function normalizeComment(comment) {
+    // Garante que comentario sempre tenha autor, mesmo se a API nao mandar completo.
+    return {
+      ...comment,
+      user: comment.user || defaultAuthor(),
+    }
+  }
+
   function syncUserInPosts(user) {
+    // Quando o usuario edita perfil/avatar, os posts ja carregados tambem precisam refletir.
     if (!user?.id) {
       return
     }
@@ -43,6 +61,7 @@ export const useFeedStore = defineStore('feed', () => {
   }
 
   function resetFeed() {
+    // Limpa o estado local do feed, usado no logout ou antes de recarregar tudo.
     postsById.value = {}
     orderedIds.value = []
     nextCursor.value = null
@@ -52,13 +71,14 @@ export const useFeedStore = defineStore('feed', () => {
   }
 
   async function fetchFeed() {
+    // Carrega a primeira pagina do feed e substitui o estado antigo.
     loading.value = true
     error.value = ''
 
     try {
-      const { data } = await api.get('/feed')
+      const data = await getFeed()
       resetFeed()
-      mergePosts(data.data || [])
+      mergePosts(data.items || data.data || [])
       nextCursor.value = data.next_cursor || null
     } catch (incomingError) {
       error.value = extractErrorMessage(incomingError, 'Nao foi possivel carregar o feed.')
@@ -69,6 +89,7 @@ export const useFeedStore = defineStore('feed', () => {
   }
 
   async function loadMoreFeed(cursor = nextCursor.value) {
+    // Carrega a proxima pagina usando o cursor retornado pela API.
     if (!cursor) {
       return
     }
@@ -77,13 +98,8 @@ export const useFeedStore = defineStore('feed', () => {
     loadingMore.value = true
 
     try {
-      const { data } = await api.get('/feed', {
-        params: {
-          cursor,
-        },
-      })
-
-      mergePosts(data.data || [])
+      const data = await getFeed({ cursor })
+      mergePosts(data.items || data.data || [])
       nextCursor.value = data.next_cursor || null
     } finally {
       loadingMore.value = false
@@ -91,6 +107,7 @@ export const useFeedStore = defineStore('feed', () => {
   }
 
   async function toggleLike(postId) {
+    // A curtida altera um post especifico que ja esta salvo no dicionario.
     const post = postsById.value[postId]
 
     if (!post) {
@@ -103,12 +120,23 @@ export const useFeedStore = defineStore('feed', () => {
 
     try {
       // Atualizacao otimista: a interface responde antes da confirmacao da API.
+      let response
+
       if (liked) {
-        await api.delete(`/posts/${postId}/unlike`)
+        response = await unlikePost(postId)
       } else {
-        await api.post(`/posts/${postId}/like`)
+        response = await likePost(postId)
+      }
+
+      if (typeof response?.liked === 'boolean') {
+        post.liked_by_me = response.liked
+      }
+
+      if (typeof response?.likes_count === 'number') {
+        post.likes_count = response.likes_count
       }
     } catch (error) {
+      // Se a API falhar, desfazemos a mudanca visual para manter o estado correto.
       post.liked_by_me = liked
       post.likes_count += liked ? 1 : -1
       throw error
@@ -116,7 +144,8 @@ export const useFeedStore = defineStore('feed', () => {
   }
 
   async function addComment(postId, body) {
-    const { data } = await api.post(`/posts/${postId}/comments`, { body })
+    // A API cria o comentario; localmente atualizamos apenas o contador do post.
+    const data = normalizeComment(await createPostComment(postId, body))
     const post = postsById.value[postId]
 
     if (post) {
@@ -127,11 +156,8 @@ export const useFeedStore = defineStore('feed', () => {
   }
 
   async function createPost(formData) {
-    const { data } = await api.post('/posts', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    })
+    // Criacao usa FormData porque envolve upload de imagem.
+    const data = await createPostRequest(formData)
 
     // O novo post entra no topo do feed local sem precisar recarregar tudo.
     postsById.value[data.id] = data
@@ -153,6 +179,7 @@ export const useFeedStore = defineStore('feed', () => {
     fetchFeed,
     loadMoreFeed,
     toggleLike,
+    normalizeComment,
     addComment,
     createPost,
   }

@@ -1,10 +1,13 @@
 <script setup>
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { ROUTE_NAMES } from '@/router/routeNames'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
-const destination = computed(() => (authStore.isAuthenticated ? '/feed' : '/login'))
+const destination = computed(() => ({
+  name: authStore.isAuthenticated ? ROUTE_NAMES.feed : ROUTE_NAMES.login,
+}))
 </script>
 
 <template>
