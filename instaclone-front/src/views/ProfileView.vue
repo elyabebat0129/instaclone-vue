@@ -6,10 +6,11 @@ import ProfilePostGrid from '@/components/profile/ProfilePostGrid.vue'
 import ProfileSummaryCards from '@/components/profile/ProfileSummaryCards.vue'
 import { ROUTE_NAMES } from '@/router/routeNames'
 import { extractErrorMessage } from '@/services/api'
-import { getIsFollowing, getUserByUsername, getUserFollowers, getUserFollowing, getUserPosts } from '@/services/users.service'
+import { getIsFollowing, getUserFollowers, getUserFollowing } from '@/services/follows.service'
+import { getUserByUsername, getUserPosts } from '@/services/users.service'
 import { useAuthStore } from '@/stores/auth'
 import { useFollowsStore } from '@/stores/follows'
-import { defaultAuthor } from '@/stores/profileUtils'
+import { defaultAuthor } from '@/utils/profile'
 
 const route = useRoute()
 const router = useRouter()

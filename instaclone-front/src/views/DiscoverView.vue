@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { onMounted, ref } from 'vue'
+import { usePagination } from '@/composables/usePagination'
 import AccountCard from '@/components/profile/AccountCard.vue'
 import { extractErrorMessage } from '@/services/api'
 import { getUserSuggestions } from '@/services/users.service'
@@ -9,15 +10,9 @@ import { useFollowsStore } from '@/stores/follows'
 const authStore = useAuthStore()
 const followsStore = useFollowsStore()
 const suggestions = ref([])
-const pagination = reactive({
-  currentPage: 1,
-  lastPage: 1,
-})
 const loading = ref(false)
 const error = ref('')
-
-const canGoBack = computed(() => pagination.currentPage > 1)
-const canGoNext = computed(() => pagination.currentPage < pagination.lastPage)
+const { pagination, canGoBack, canGoNext, setPagination } = usePagination()
 
 async function fetchSuggestions(page = 1) {
   loading.value = true
@@ -33,8 +28,7 @@ async function fetchSuggestions(page = 1) {
     ])
 
     suggestions.value = suggestionsData.data || []
-    pagination.currentPage = suggestionsData.current_page || page
-    pagination.lastPage = suggestionsData.last_page || 1
+    setPagination(suggestionsData, page)
   } catch (incomingError) {
     error.value = extractErrorMessage(incomingError, 'Nao foi possivel carregar sugestoes.')
   } finally {

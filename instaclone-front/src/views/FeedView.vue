@@ -5,13 +5,11 @@ import { extractErrorMessage } from '@/services/api'
 import { useFeedStore } from '@/stores/feed'
 
 const feedStore = useFeedStore()
-// Estados locais da tela: comentarios e loading de curtida por post.
 const commentForms = reactive({})
 const likeLoadingByPost = reactive({})
 const pageError = ref('')
 
 function ensureCommentState(postId) {
-  // Cada post do feed guarda seu proprio estado de comentario inline.
   if (!commentForms[postId]) {
     commentForms[postId] = {
       body: '',
@@ -24,21 +22,18 @@ function ensureCommentState(postId) {
 }
 
 onMounted(() => {
-  // Ao abrir a view, busca os posts atuais na store/API.
   feedStore.fetchFeed().catch((error) => {
     pageError.value = extractErrorMessage(error, 'Nao foi possivel carregar o feed.')
   })
 })
 
 function updateComment(postId, value) {
-  // Chamado pelo PostCard enquanto o usuario digita no textarea.
   const state = ensureCommentState(postId)
   state.body = value
   state.error = ''
 }
 
 async function submitComment(postId) {
-  // Valida e envia comentario sem sair do feed.
   const state = ensureCommentState(postId)
 
   if (!state.body.trim()) {
@@ -60,7 +55,6 @@ async function submitComment(postId) {
 }
 
 async function toggleLike(postId) {
-  // Controla loading por post para nao travar o feed inteiro.
   likeLoadingByPost[postId] = true
 
   try {
@@ -73,7 +67,6 @@ async function toggleLike(postId) {
 }
 
 async function loadMore() {
-  // Pede para a store carregar a proxima pagina/cursor.
   try {
     await feedStore.loadMoreFeed()
   } catch (error) {
@@ -94,13 +87,11 @@ async function loadMore() {
       {{ pageError || feedStore.error }}
     </div>
 
-    <!-- Estados da tela: carregando, lista com posts ou vazio. -->
     <div v-if="feedStore.loading" class="surface-card">
       <div class="muted-copy">Carregando feed...</div>
     </div>
 
     <div v-else-if="feedStore.items.length" class="d-flex flex-column gap-4">
-      <!-- v-for cria um card para cada post; os eventos do filho voltam para esta view. -->
       <PostCard
         v-for="post in feedStore.items"
         :key="post.id"

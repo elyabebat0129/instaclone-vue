@@ -5,13 +5,12 @@ import { useImageUpload } from '@/composables/useImageUpload'
 import FormFieldError from '@/components/common/FormFieldError.vue'
 import { ROUTE_NAMES } from '@/router/routeNames'
 import { extractErrorMessage } from '@/services/api'
-import { POST_CAPTION_MAX_LENGTH, POST_IMAGE_MAX_MB } from '@/stores/profileUtils'
+import { POST_CAPTION_MAX_LENGTH, POST_IMAGE_MAX_MB } from '@/utils/profile'
 import { useFeedStore } from '@/stores/feed'
 
 const router = useRouter()
 const feedStore = useFeedStore()
 
-// Formulario simples: legenda fica reativa e a imagem fica no composable.
 const form = reactive({
   caption: '',
 })
@@ -20,18 +19,15 @@ const errors = ref({})
 const loading = ref(false)
 const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
-// useImageUpload concentra preview, validacao de tipo e limite de tamanho.
 const imageUpload = useImageUpload({
   validTypes,
   maxSizeInMb: POST_IMAGE_MAX_MB,
 })
 
-// Valores derivados do estado atual do formulario.
 const captionCount = computed(() => form.caption.length)
 const canSubmit = computed(() => imageUpload.hasFile.value && form.caption.trim().length > 0 && !loading.value)
 
 function handleFileChange(event) {
-  // Valida o arquivo assim que o usuario seleciona a imagem.
   errors.value = {}
   const validation = imageUpload.handleFileChange(event)
 
@@ -41,7 +37,6 @@ function handleFileChange(event) {
 }
 
 async function handleSubmit() {
-  // Valida no front antes de enviar para a API.
   errors.value = {}
 
   if (!imageUpload.file.value) {
@@ -57,13 +52,11 @@ async function handleSubmit() {
   loading.value = true
 
   try {
-    // Upload de arquivo precisa ir em FormData, nao em JSON comum.
     const payload = new FormData()
     payload.append('image', imageUpload.file.value)
     payload.append('caption', form.caption.trim())
 
     await feedStore.createPost(payload)
-    // Depois de publicar, volta para o feed onde o post ja entra no estado local.
     router.push({ name: ROUTE_NAMES.feed })
   } catch (error) {
     if (error.response?.status === 422 && error.response?.data?.errors) {
@@ -100,7 +93,6 @@ async function handleSubmit() {
           <FormFieldError :errors="errors.image" />
 
           <div v-if="imageUpload.previewUrl.value" class="mt-4">
-            <!-- Preview local antes do envio para a API. -->
             <img :src="imageUpload.previewUrl.value" alt="Preview do post" class="post-card__image" />
           </div>
           <div v-else class="empty-state mt-4">
@@ -120,7 +112,6 @@ async function handleSubmit() {
 
           <div>
             <label class="form-label" for="caption">Legenda</label>
-            <!-- v-model mantem textarea e form.caption sincronizados. -->
             <textarea
               id="caption"
               v-model="form.caption"

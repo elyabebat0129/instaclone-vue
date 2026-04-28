@@ -7,7 +7,7 @@ import { ROUTE_NAMES } from '@/router/routeNames'
 import { getUserSuggestions } from '@/services/users.service'
 import { useAuthStore } from '@/stores/auth'
 import { useFollowsStore } from '@/stores/follows'
-import { defaultAuthor } from '@/stores/profileUtils'
+import { defaultAuthor } from '@/utils/profile'
 
 const route = useRoute()
 const authStore = useAuthStore()

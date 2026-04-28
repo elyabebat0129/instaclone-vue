@@ -1,7 +1,7 @@
 <script setup>
 import { RouterLink } from 'vue-router'
 import { ROUTE_NAMES } from '@/router/routeNames'
-import { defaultAuthor } from '@/stores/profileUtils'
+import { defaultAuthor } from '@/utils/profile'
 
 defineProps({
   profile: {

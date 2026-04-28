@@ -1,6 +1,7 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { usePagination } from '@/composables/usePagination'
 import AccountCard from '@/components/profile/AccountCard.vue'
 import { CONNECTION_LIST_TYPES, ROUTE_NAMES } from '@/router/routeNames'
 import { extractErrorMessage } from '@/services/api'
@@ -8,7 +9,7 @@ import { getUserFollowers, getUserFollowing } from '@/services/follows.service'
 import { getUserByUsername } from '@/services/users.service'
 import { useAuthStore } from '@/stores/auth'
 import { useFollowsStore } from '@/stores/follows'
-import { defaultAuthor } from '@/stores/profileUtils'
+import { defaultAuthor } from '@/utils/profile'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -18,10 +19,7 @@ const profile = ref(null)
 const users = ref([])
 const loading = ref(false)
 const error = ref('')
-const pagination = reactive({
-  currentPage: 1,
-  lastPage: 1,
-})
+const { pagination, canGoBack, canGoNext, setPagination } = usePagination()
 
 const targetUsername = computed(() => route.query.user || authStore.user?.username || '')
 const isOwnProfile = computed(() => targetUsername.value === authStore.user?.username)
@@ -57,8 +55,7 @@ async function loadConnections(page = 1) {
       : await getUserFollowing(profileData.id, { page, per_page: 12 })
 
     users.value = data.data || []
-    pagination.currentPage = data.current_page || page
-    pagination.lastPage = data.last_page || 1
+    setPagination(data, page)
   } catch (incomingError) {
     error.value = extractErrorMessage(incomingError, 'Nao foi possivel carregar esta lista.')
   } finally {
@@ -122,7 +119,7 @@ watch(() => [route.query.user, route.params.type], () => {
           <button
             type="button"
             class="btn btn-ghost-brand"
-            :disabled="pagination.currentPage <= 1"
+            :disabled="!canGoBack"
             @click="loadConnections(pagination.currentPage - 1)"
           >
             Voltar
@@ -130,7 +127,7 @@ watch(() => [route.query.user, route.params.type], () => {
           <button
             type="button"
             class="btn btn-brand"
-            :disabled="pagination.currentPage >= pagination.lastPage"
+            :disabled="!canGoNext"
             @click="loadConnections(pagination.currentPage + 1)"
           >
             Proxima

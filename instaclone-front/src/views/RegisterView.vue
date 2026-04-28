@@ -22,7 +22,6 @@ async function handleSubmit() {
   errors.value = {}
 
   try {
-    // O cadastro ja autentica o usuario e leva direto para o feed.
     await authStore.register(form)
     router.push({ name: ROUTE_NAMES.feed })
   } catch (incomingErrors) {

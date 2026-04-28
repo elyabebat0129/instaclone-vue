@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { usePagination } from '@/composables/usePagination'
 import AppIcon from '@/components/layout/AppIcon.vue'
 import PostCommentForm from '@/components/feed/PostCommentForm.vue'
 import PostCommentList from '@/components/feed/PostCommentList.vue'
@@ -9,9 +10,8 @@ import { extractErrorMessage } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { createPostComment, deleteComment, getPostComments } from '@/services/comments.service'
 import { useFeedStore } from '@/stores/feed'
-import { likePost, unlikePost } from '@/services/likes.service'
 import { deletePost, getPostById } from '@/services/posts.service'
-import { defaultAuthor } from '@/stores/profileUtils'
+import { defaultAuthor } from '@/utils/profile'
 import { formatRelative } from '@/utils/dates'
 
 const route = useRoute()
@@ -31,10 +31,7 @@ const commentForm = reactive({
   loading: false,
   error: '',
 })
-const pagination = reactive({
-  currentPage: 1,
-  lastPage: 1,
-})
+const { pagination, canGoNext, setPagination } = usePagination()
 
 const postId = computed(() => route.params.postId)
 const isOwner = computed(() => post.value?.user_id === authStore.user?.id)
@@ -58,8 +55,7 @@ async function loadComments(page = 1, append = false) {
     })
 
     comments.value = append ? [...comments.value, ...(data.data || [])] : data.data || []
-    pagination.currentPage = data.current_page || page
-    pagination.lastPage = data.last_page || 1
+    setPagination(data, page)
   } finally {
     commentsLoading.value = false
     loadingMore.value = false
@@ -86,31 +82,11 @@ async function toggleLike() {
     return
   }
 
-  const previousLiked = Boolean(post.value.liked_by_me)
-  const previousCount = post.value.likes_count
   likeLoading.value = true
-  post.value.liked_by_me = !previousLiked
-  post.value.likes_count += previousLiked ? -1 : 1
 
   try {
-    const response = previousLiked
-      ? await unlikePost(post.value.id)
-      : await likePost(post.value.id)
-
-    post.value.liked_by_me = Boolean(response?.liked)
-    post.value.likes_count = typeof response?.likes_count === 'number'
-      ? response.likes_count
-      : post.value.likes_count
-
-    const feedPost = feedStore.postsById[post.value.id]
-
-    if (feedPost) {
-      feedPost.liked_by_me = post.value.liked_by_me
-      feedPost.likes_count = post.value.likes_count
-    }
+    await feedStore.togglePostLike(post.value)
   } catch (incomingError) {
-    post.value.liked_by_me = previousLiked
-    post.value.likes_count = previousCount
     error.value = extractErrorMessage(incomingError, 'Nao foi possivel atualizar a curtida.')
   } finally {
     likeLoading.value = false
@@ -256,7 +232,7 @@ watch(() => route.params.postId, () => {
               @submit="submitComment"
             />
 
-            <div v-if="pagination.currentPage < pagination.lastPage" class="d-flex justify-content-end mt-3">
+            <div v-if="canGoNext" class="d-flex justify-content-end mt-3">
               <button
                 type="button"
                 class="btn btn-ghost-brand"

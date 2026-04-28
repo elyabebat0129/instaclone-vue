@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { formatRelative } from '@/utils/dates'
-import { defaultAuthor } from '@/stores/profileUtils'
+import { defaultAuthor } from '@/utils/profile'
 
 const props = defineProps({
   comment: {

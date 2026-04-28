@@ -3,7 +3,6 @@ import { useAuthStore } from '@/stores/auth'
 import { CONNECTION_LIST_TYPES, ROUTE_NAMES } from '@/router/routeNames'
 
 const routes = [
-  // Cada item representa uma URL da aplicacao e qual view deve ser carregada.
   {
     path: '/',
     redirect: { name: ROUTE_NAMES.feed },
@@ -13,7 +12,6 @@ const routes = [
     name: ROUTE_NAMES.login,
     component: () => import('@/views/LoginView.vue'),
     meta: {
-      // meta guarda informacoes extras usadas pelo App.vue e pelo guard abaixo.
       layout: 'auth',
       requiresGuest: true,
     },
@@ -36,7 +34,6 @@ const routes = [
     name: ROUTE_NAMES.feed,
     component: () => import('@/views/FeedView.vue'),
     meta: {
-      // requiresAuth protege a rota; navItem ajuda a navegacao a saber onde esta.
       requiresAuth: true,
       navItem: ROUTE_NAMES.feed,
     },
@@ -133,26 +130,21 @@ const routes = [
 ]
 
 const router = createRouter({
-  // createWebHistory deixa as URLs limpas, sem #.
   history: createWebHistory(),
   routes,
 })
 
 router.beforeEach(async (to) => {
-  // Guard global: roda antes de toda navegacao.
   const authStore = useAuthStore()
 
   if (authStore.token && !authStore.user) {
-    // Se existe token salvo mas a store ainda nao tem usuario, tenta buscar /auth/me.
     try {
       await authStore.hydrateAuthState()
     } catch {
-      // A store e o interceptor ja limpam a sessao se o token for invalido.
     }
   }
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    // Rota protegida sem login volta para /login e guarda para onde o usuario queria ir.
     return {
       name: ROUTE_NAMES.login,
       query: {
@@ -162,7 +154,6 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.requiresGuest && authStore.isAuthenticated) {
-    // Usuario logado nao precisa ver login/cadastro de novo.
     return { name: ROUTE_NAMES.feed }
   }
 

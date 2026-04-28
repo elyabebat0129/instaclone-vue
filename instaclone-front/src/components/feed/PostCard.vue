@@ -3,11 +3,10 @@ import { computed, reactive } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/layout/AppIcon.vue'
 import { ROUTE_NAMES } from '@/router/routeNames'
-import { defaultAuthor } from '@/stores/profileUtils'
+import { defaultAuthor } from '@/utils/profile'
 import { formatRelative } from '@/utils/dates'
 
 const props = defineProps({
-  // Props sao dados recebidos da view pai, neste caso a FeedView.
   post: {
     type: Object,
     required: true,
@@ -22,7 +21,6 @@ const props = defineProps({
   },
 })
 
-// O card nao altera a store diretamente; ele emite eventos para a tela pai decidir.
 const emit = defineEmits(['toggle-like', 'submit-comment', 'update-comment'])
 
 const fallbackState = reactive({
@@ -31,7 +29,6 @@ const fallbackState = reactive({
   error: '',
 })
 
-// computed deixa estes valores atualizados sempre que props mudarem.
 const state = computed(() => props.commentState || fallbackState)
 const author = computed(() => defaultAuthor(props.post.user))
 const profileTarget = computed(() => ({
@@ -40,7 +37,6 @@ const profileTarget = computed(() => ({
 }))
 
 function handleCommentSubmit() {
-  // Envia apenas o id do post; a FeedView conhece o estado do formulario.
   emit('submit-comment', props.post.id)
 }
 </script>
@@ -70,7 +66,6 @@ function handleCommentSubmit() {
     </RouterLink>
 
     <div class="post-card__actions mb-3">
-      <!-- Clique no botao avisa o pai para curtir/descurtir. -->
       <button
         type="button"
         class="post-action-btn"
@@ -96,7 +91,6 @@ function handleCommentSubmit() {
     </div>
 
     <form class="d-flex flex-column gap-2" @submit.prevent="handleCommentSubmit">
-      <!-- O textarea recebe valor via prop e avisa mudancas por evento. -->
       <textarea
         :value="state.body"
         class="form-control"
