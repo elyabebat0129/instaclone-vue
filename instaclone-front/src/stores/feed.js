@@ -5,7 +5,7 @@ import { createPostComment } from '@/services/comments.service'
 import { getFeed } from '@/services/feed.service'
 import { likePost, unlikePost } from '@/services/likes.service'
 import { createPostRequest } from '@/services/posts.service'
-import { defaultAuthor } from '@/utils/profile'
+import { defaultAuthor } from '@/stores/profileUtils'
 
 export const useFeedStore = defineStore('feed', () => {
   const postsById = ref({})
@@ -96,13 +96,14 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
-  async function togglePostLike(post) {
+  async function toggleLike(postId) {
+    const post = postsById.value[postId]
+
     if (!post) {
       return
     }
 
     const liked = Boolean(post.liked_by_me)
-    const previousCount = post.likes_count
     post.liked_by_me = !liked
     post.likes_count += liked ? -1 : 1
 
@@ -110,9 +111,9 @@ export const useFeedStore = defineStore('feed', () => {
       let response
 
       if (liked) {
-        response = await unlikePost(post.id)
+        response = await unlikePost(postId)
       } else {
-        response = await likePost(post.id)
+        response = await likePost(postId)
       }
 
       if (typeof response?.liked === 'boolean') {
@@ -122,20 +123,11 @@ export const useFeedStore = defineStore('feed', () => {
       if (typeof response?.likes_count === 'number') {
         post.likes_count = response.likes_count
       }
-
-      if (postsById.value[post.id] && postsById.value[post.id] !== post) {
-        postsById.value[post.id].liked_by_me = post.liked_by_me
-        postsById.value[post.id].likes_count = post.likes_count
-      }
     } catch (error) {
       post.liked_by_me = liked
-      post.likes_count = previousCount
+      post.likes_count += liked ? 1 : -1
       throw error
     }
-  }
-
-  async function toggleLike(postId) {
-    return togglePostLike(postsById.value[postId])
   }
 
   async function addComment(postId, body) {
@@ -170,7 +162,6 @@ export const useFeedStore = defineStore('feed', () => {
     resetFeed,
     fetchFeed,
     loadMoreFeed,
-    togglePostLike,
     toggleLike,
     normalizeComment,
     addComment,

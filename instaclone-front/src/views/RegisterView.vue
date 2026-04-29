@@ -20,7 +20,6 @@ const errors = ref({})
 
 async function handleSubmit() {
   errors.value = {}
-
   try {
     await authStore.register(form)
     router.push({ name: ROUTE_NAMES.feed })

@@ -18,7 +18,6 @@ const errors = ref({})
 
 async function handleSubmit() {
   errors.value = {}
-
   try {
     await authStore.login(form)
     router.push(route.query.redirect || { name: ROUTE_NAMES.feed })

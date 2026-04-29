@@ -12,6 +12,18 @@ export function getUserPosts(userId, params = {}) {
   return api.get(`/users/${userId}/posts`, { params }).then((response) => response.data)
 }
 
+export function getUserFollowers(userId, params = {}) {
+  return api.get(`/users/${userId}/followers`, { params }).then((response) => response.data)
+}
+
+export function getUserFollowing(userId, params = {}) {
+  return api.get(`/users/${userId}/following`, { params }).then((response) => response.data)
+}
+
+export function getIsFollowing(userId) {
+  return api.get(`/users/${userId}/is-following`).then((response) => response.data)
+}
+
 export function updateMyProfile(payload) {
   return api.put('/users/me', payload).then((response) => response.data)
 }
